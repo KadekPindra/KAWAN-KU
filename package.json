@@ -12,6 +12,7 @@
     "slack": "tsx src/adapters/slack/run.ts",
     "seed": "tsx src/seed/seed.ts",
     "db:seed": "tsx src/adapters/postgres/seed.ts",
+    "metrics": "tsx src/views/run.ts",
     "dev": "tsx watch src/demo/runSpine.ts"
   },
   "keywords": [

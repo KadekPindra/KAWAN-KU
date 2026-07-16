@@ -1,2 +1,16 @@
 node_modules/
+dist/
+
+# Env / secrets — never commit; .env.example is the tracked template
 .env
+.env.local
+.env.*.local
+
+# Test / coverage
+coverage/
+
+# Logs & OS cruft
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

@@ -78,6 +78,9 @@ export class InMemoryRepository implements Repository {
     const n = this.needs.get(id);
     return n ? clone(n) : null;
   }
+  async listNeeds(teamId: string, week: Week): Promise<Need[]> {
+    return [...this.needs.values()].filter((n) => n.teamId === teamId && n.week === week).map(clone);
+  }
   async listOpenNeeds(teamId: string, week: Week): Promise<Need[]> {
     return [...this.needs.values()]
       .filter((n) => n.teamId === teamId && n.week === week && n.status === 'open')
@@ -109,8 +112,15 @@ export class InMemoryRepository implements Repository {
     const i = this.invites.get(id);
     return i ? clone(i) : null;
   }
+  async findInvite(personId: string, needId: string): Promise<Invite | null> {
+    const i = [...this.invites.values()].find((x) => x.personId === personId && x.needId === needId);
+    return i ? clone(i) : null;
+  }
   async listInvitesForPool(poolId: string): Promise<Invite[]> {
     return [...this.invites.values()].filter((i) => i.poolId === poolId).map(clone);
+  }
+  async listInvitesForNeed(needId: string): Promise<Invite[]> {
+    return [...this.invites.values()].filter((i) => i.needId === needId).map(clone);
   }
   async saveInvite(invite: Invite): Promise<void> {
     this.invites.set(invite.id, clone(invite));

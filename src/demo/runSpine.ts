@@ -56,8 +56,8 @@ const weekly = await runWeekly(
 for (const d of weekly.delivered) {
   console.log(`\nNeed "${d.need.rawText}"`);
   console.log(`  parse → ${JSON.stringify(d.need.parsed)}`);
-  console.log(`  ❌ ajakan    : ${invitationTemplate(d.need)}`);
-  console.log(`  ✅ kebutuhan : ${d.copy.needFramed}`);
+  console.log(`  ajakan    : ${invitationTemplate(d.need)}`);
+  console.log(`  kebutuhan : ${d.copy.needFramed}`);
   console.log(
     `  pool ${d.pool.memberIds.length} orang (urut acak; dilusi ≤ ⅓, identitas skew tak pernah ditampilkan): ${d.pool.memberIds
       .map(name)

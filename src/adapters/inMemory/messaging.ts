@@ -1,8 +1,8 @@
 import type { MessagingPort, InboundEvent } from '../../ports/messaging';
-import type { Cycle, Need } from '../../domain/types';
+import type { Cycle, InviteCopy, Need } from '../../domain/types';
 
 type PostedScreening = { teamId: string; cycle: Cycle };
-type DeliveredPool = { need: Need; userIds: string[] };
+type DeliveredPool = { need: Need; userIds: string[]; copy: InviteCopy };
 
 export class InMemoryMessaging implements MessagingPort {
   readonly postedScreenings: PostedScreening[] = [];
@@ -16,8 +16,8 @@ export class InMemoryMessaging implements MessagingPort {
   async postScreening(teamId: string, cycle: Cycle): Promise<void> {
     this.postedScreenings.push({ teamId, cycle });
   }
-  async deliverPool(need: Need, userIds: string[]): Promise<void> {
-    this.deliveredPools.push({ need, userIds });
+  async deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void> {
+    this.deliveredPools.push({ need, userIds, copy });
   }
   async openClinicalDoor(userId: string): Promise<void> {
     this.clinicalDoors.push(userId);

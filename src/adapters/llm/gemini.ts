@@ -15,7 +15,6 @@ export interface GeminiClient {
   generate(req: GenerateRequest): Promise<string>;
 }
 
-// Lazy: SDK hanya di-load saat call pertama, jadi jalur tanpa key tak menyentuh paket.
 class SdkGeminiClient implements GeminiClient {
   private ai: import('@google/genai').GoogleGenAI | null = null;
 
@@ -124,7 +123,6 @@ const INVITE_SCHEMA: Record<string, unknown> = {
 const INVITATION_MARKERS = /\b(yuk|ayo|ikutan|gabung|join|mari|kuy)\b/i;
 const SYMPATHY_MARKERS = /(sendirian|kesepian|kasihan|iba|jangan sedih|biar\s+nggak\s+sendiri)/i;
 
-// Guard kontrak ❌/✅ — walau prompt melarang, output tetap diverifikasi deterministik.
 export function passesNeedContract(text: string): boolean {
   return text.trim().length > 0 && !INVITATION_MARKERS.test(text) && !SYMPATHY_MARKERS.test(text);
 }

@@ -1,4 +1,4 @@
-import type { Anchor, Cycle, Need } from '../domain/types';
+import type { Anchor, Cycle, InviteCopy, Need } from '../domain/types';
 
 export type InboundEvent =
   | { kind: 'screenAnswer'; personId: string; cycle: Cycle; q: 1 | 2 | 3; value: Anchor }
@@ -9,7 +9,7 @@ export type InboundEvent =
 
 export interface MessagingPort {
   postScreening(teamId: string, cycle: Cycle): Promise<void>;
-  deliverPool(need: Need, userIds: string[]): Promise<void>;
+  deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void>;
   openClinicalDoor(userId: string): Promise<void>;
   receiveResponse(): AsyncIterable<InboundEvent>;
 }

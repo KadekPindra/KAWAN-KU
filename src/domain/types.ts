@@ -54,6 +54,11 @@ export interface ParsedNeed {
   effort: Effort;
 }
 
+export interface InviteCopy {
+  needFramed: string;
+  claimLabel: string;
+}
+
 export interface Need {
   id: string;
   teamId: string;
@@ -72,7 +77,7 @@ export interface Pool {
   needId: string;
   week: Week;
   memberIds: string[];
-  skewedIds: string[]; // never leaves core — jangan pernah dirender ke user
+  skewedIds: string[];
 }
 
 export interface Invite {

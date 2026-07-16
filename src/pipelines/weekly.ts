@@ -69,7 +69,7 @@ export async function runWeekly(
     }
 
     const copy = await deps.composer.compose(need);
-    await deps.messaging.deliverPool(need, pool.memberIds);
+    await deps.messaging.deliverPool(need, pool.memberIds, copy);
     delivered.push({ pool, need, copy });
   }
 

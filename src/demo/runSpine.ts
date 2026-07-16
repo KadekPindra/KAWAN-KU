@@ -1,8 +1,8 @@
 import { config } from '../config/index';
 import { InMemoryRepository } from '../adapters/inMemory/repository';
 import { InMemoryMessaging } from '../adapters/inMemory/messaging';
-import { TemplateNeedParser } from '../core/needParser';
-import { TemplateInviteComposer, invitationTemplate } from '../core/inviteComposer';
+import { invitationTemplate } from '../core/inviteComposer';
+import { createGeminiClient, GeminiNeedParser, GeminiInviteComposer } from '../adapters/llm/gemini';
 import { ClaimService, OutcomeLog } from '../core/claim';
 import { ClinicalRouter } from '../core/clinicalRouter';
 import { MetricsAggregator } from '../core/metrics';
@@ -17,8 +17,9 @@ function hr(title: string): void {
 
 const repo = new InMemoryRepository();
 const messaging = new InMemoryMessaging();
-const parser = new TemplateNeedParser();
-const composer = new TemplateInviteComposer();
+const gemini = createGeminiClient();
+const parser = new GeminiNeedParser(gemini);
+const composer = new GeminiInviteComposer(gemini);
 
 await seedDemoTeam(repo);
 await seedDemoNeeds(repo);

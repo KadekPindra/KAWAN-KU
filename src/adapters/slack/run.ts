@@ -1,5 +1,5 @@
 import { App } from '@slack/bolt';
-import { InMemoryRepository } from '../inMemory/repository';
+import { createRepository } from '../repositoryFactory';
 import { createGeminiClient, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
 import { ScreeningService } from '../../core/screening';
 import { NeedHarvester } from '../../core/needHarvester';
@@ -20,9 +20,11 @@ if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
 
 const cycle = DEMO_CYCLES[DEMO_CYCLES.length - 1];
 
-const repo = new InMemoryRepository();
-await seedDemoTeam(repo);
-await seedDemoNeeds(repo);
+const repo = await createRepository();
+if (process.env.KAWAN_REPO?.trim().toLowerCase() !== 'postgres') {
+  await seedDemoTeam(repo);
+  await seedDemoNeeds(repo);
+}
 
 const app = new App({
   token: SLACK_BOT_TOKEN,

@@ -1,0 +1,53 @@
+import 'dotenv/config';
+
+export type Cadence = 'monthly' | 'weekly';
+
+export interface AffinityWeights {
+  affinity: number; 
+  effort: number;
+  novelty: number; 
+  timing: number; 
+}
+
+export interface Config {
+  LONELY_THRESHOLD: number; 
+  CLINICAL_CYCLES: number; 
+  SCREEN_CADENCE: Cadence;
+  ROUTE_CADENCE: Cadence;
+  POOL_SIZE: number;
+  MAX_SKEW_RATIO: number; 
+  MAX_POOLS_PER_WEEK: number; 
+  SUPPLY_FLOOR: number; 
+  K_ANON: number; 
+  affinityWeights: AffinityWeights;
+}
+
+function num(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function cadence(name: string, fallback: Cadence): Cadence {
+  const raw = process.env[name]?.trim();
+  return raw === 'monthly' || raw === 'weekly' ? raw : fallback;
+}
+
+export const config: Config = {
+  LONELY_THRESHOLD: num('LONELY_THRESHOLD', 6),
+  CLINICAL_CYCLES: num('CLINICAL_CYCLES', 3),
+  SCREEN_CADENCE: cadence('SCREEN_CADENCE', 'monthly'),
+  ROUTE_CADENCE: cadence('ROUTE_CADENCE', 'weekly'),
+  POOL_SIZE: num('POOL_SIZE', 6),
+  MAX_SKEW_RATIO: num('MAX_SKEW_RATIO', 1 / 3),
+  MAX_POOLS_PER_WEEK: num('MAX_POOLS_PER_WEEK', 2),
+  SUPPLY_FLOOR: num('SUPPLY_FLOOR', 3),
+  K_ANON: num('K_ANON', 20),
+  affinityWeights: {
+    affinity: num('W_AFFINITY', 0.5),
+    effort: num('W_EFFORT', 0.2),
+    novelty: num('W_NOVELTY', 0.15),
+    timing: num('W_TIMING', 0.15),
+  },
+};

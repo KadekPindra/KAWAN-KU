@@ -27,6 +27,7 @@ export interface Repository {
   saveDetectionState(state: DetectionState): Promise<void>;
 
   getNeed(id: string): Promise<Need | null>;
+  listNeeds(teamId: string, week: Week): Promise<Need[]>;
   listOpenNeeds(teamId: string, week: Week): Promise<Need[]>;
   saveNeed(need: Need): Promise<void>;
   claimSlot(needId: string): Promise<number | null>;
@@ -36,7 +37,9 @@ export interface Repository {
   savePool(pool: Pool): Promise<void>;
 
   getInvite(id: string): Promise<Invite | null>;
+  findInvite(personId: string, needId: string): Promise<Invite | null>;
   listInvitesForPool(poolId: string): Promise<Invite[]>;
+  listInvitesForNeed(needId: string): Promise<Invite[]>;
   saveInvite(invite: Invite): Promise<void>;
 
   saveOutcome(outcome: Outcome): Promise<void>;

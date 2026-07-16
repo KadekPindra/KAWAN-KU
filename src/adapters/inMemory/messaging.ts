@@ -1,0 +1,51 @@
+import type { MessagingPort, InboundEvent } from '../../ports/messaging';
+import type { Cycle, Need } from '../../domain/types';
+
+type PostedScreening = { teamId: string; cycle: Cycle };
+type DeliveredPool = { need: Need; userIds: string[] };
+
+export class InMemoryMessaging implements MessagingPort {
+  readonly postedScreenings: PostedScreening[] = [];
+  readonly deliveredPools: DeliveredPool[] = [];
+  readonly clinicalDoors: string[] = [];
+
+  private buffer: InboundEvent[] = [];
+  private waiting: ((r: IteratorResult<InboundEvent>) => void)[] = [];
+  private closed = false;
+
+  async postScreening(teamId: string, cycle: Cycle): Promise<void> {
+    this.postedScreenings.push({ teamId, cycle });
+  }
+  async deliverPool(need: Need, userIds: string[]): Promise<void> {
+    this.deliveredPools.push({ need, userIds });
+  }
+  async openClinicalDoor(userId: string): Promise<void> {
+    this.clinicalDoors.push(userId);
+  }
+
+  emit(event: InboundEvent): void {
+    const w = this.waiting.shift();
+    if (w) w({ value: event, done: false });
+    else this.buffer.push(event);
+  }
+  close(): void {
+    this.closed = true;
+    for (const w of this.waiting.splice(0)) w({ value: undefined as never, done: true });
+  }
+
+  async *receiveResponse(): AsyncIterable<InboundEvent> {
+    while (true) {
+      const queued = this.buffer.shift();
+      if (queued !== undefined) {
+        yield queued;
+        continue;
+      }
+      if (this.closed) return;
+      const next = await new Promise<IteratorResult<InboundEvent>>((resolve) =>
+        this.waiting.push(resolve),
+      );
+      if (next.done) return;
+      yield next.value;
+    }
+  }
+}

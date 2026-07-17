@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import {
   GeminiNeedParser,
   GeminiInviteComposer,
+  GeminiClaimAcknowledger,
   passesNeedContract,
   type GeminiClient,
 } from '../src/adapters/llm/gemini';
 import { parseNeedTemplate } from '../src/core/needParser';
 import { needFramedTemplate } from '../src/core/inviteComposer';
+import { TemplateClaimAcknowledger } from '../src/core/claimAcknowledger';
 import type { Need } from '../src/domain/types';
 
 function need(): Need {
@@ -100,6 +102,29 @@ describe('GeminiInviteComposer', () => {
     const client = fakeClient(JSON.stringify({ problem: 'Ada yang baru butuh 1 orang.', needFramed: '', claimLabel: 'x' }));
     const copy = await new GeminiInviteComposer(client).compose(need());
     expect(copy.needFramed).toBe(needFramedTemplate(need()));
+  });
+});
+
+describe('GeminiClaimAcknowledger', () => {
+  it('tanpa client => identik dengan template', async () => {
+    const text = await new GeminiClaimAcknowledger(null).acknowledge(need(), 'claimed');
+    expect(text).toBe(await new TemplateClaimAcknowledger().acknowledge(need(), 'claimed'));
+  });
+
+  it('JSON valid => teks dari LLM dipakai apa adanya', async () => {
+    const client = fakeClient(JSON.stringify({ text: 'Makasih banyak ya udah bantu isi slotnya!' }));
+    const text = await new GeminiClaimAcknowledger(client).acknowledge(need(), 'claimed');
+    expect(text).toBe('Makasih banyak ya udah bantu isi slotnya!');
+  });
+
+  it('JSON invalid => fallback template', async () => {
+    const text = await new GeminiClaimAcknowledger(fakeClient('bukan json')).acknowledge(need(), 'declined');
+    expect(text).toBe(await new TemplateClaimAcknowledger().acknowledge(need(), 'declined'));
+  });
+
+  it('client error => fallback template', async () => {
+    const text = await new GeminiClaimAcknowledger(throwingClient()).acknowledge(need(), 'full');
+    expect(text).toBe(await new TemplateClaimAcknowledger().acknowledge(need(), 'full'));
   });
 });
 

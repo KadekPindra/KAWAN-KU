@@ -1,7 +1,7 @@
 import type { App } from '@slack/bolt';
 import type { KnownBlock } from '@slack/types';
 import type { Anchor, Cycle, InviteCopy, Need } from '../../domain/types';
-import type { InboundEvent, MessagingPort } from '../../ports/messaging';
+import type { ClaimOutcome, InboundEvent, MessagingPort } from '../../ports/messaging';
 import { CRISIS_RESOURCES } from '../../core/clinicalRouter';
 import { config } from '../../config/index';
 import type { SlackDirectory } from './directory';
@@ -114,12 +114,25 @@ function isQuestionActionsBlock(b: KnownBlock, q: 1 | 2 | 3): boolean {
   );
 }
 
-// Kunci pertanyaan yang sudah dijawab: ganti baris tombol jadi teks statis supaya tak bisa di-tap ulang.
 export function markQuestionAnswered(blocks: KnownBlock[], q: 1 | 2 | 3, chosen: Anchor): KnownBlock[] {
   return blocks.map((b) =>
     isQuestionActionsBlock(b, q)
       ? { type: 'context', elements: [{ type: 'mrkdwn', text: `✅ Jawaban kamu: *${UCLA3_ANCHORS[chosen]}*` }] }
       : b,
+  );
+}
+
+function isPoolActionsBlock(b: KnownBlock): boolean {
+  return (
+    b.type === 'actions' &&
+    Array.isArray(b.elements) &&
+    b.elements.some((el) => 'action_id' in el && (el.action_id === 'claim' || el.action_id === 'decline'))
+  );
+}
+
+export function markPoolAnswered(blocks: KnownBlock[], lockedText: string): KnownBlock[] {
+  return blocks.map((b) =>
+    isPoolActionsBlock(b) ? { type: 'context', elements: [{ type: 'mrkdwn', text: lockedText }] } : b,
   );
 }
 
@@ -215,6 +228,10 @@ export class SlackAdapter implements MessagingPort {
       if (event?.kind === 'screenAnswer') {
         await this.lockAnsweredQuestion(b.channel?.id, b.message, event.q, event.value);
       }
+      if (event?.kind === 'claim' || event?.kind === 'decline') {
+        const lockedText = event.kind === 'claim' ? '✅ Kamu ambil slot ini.' : '👍 Oke, lain kali ya.';
+        await this.lockPoolAction(b.channel?.id, b.message, lockedText);
+      }
     });
   }
 
@@ -240,6 +257,31 @@ export class SlackAdapter implements MessagingPort {
         channel,
         ts: message.ts,
         blocks: markQuestionAnswered(message.blocks, q, chosen),
+      });
+    }
+  }
+
+  private async lockPoolAction(
+    channel: string | undefined,
+    message: { ts?: string; blocks?: KnownBlock[]; attachments?: { color?: string; blocks?: KnownBlock[] }[] } | undefined,
+    lockedText: string,
+  ): Promise<void> {
+    if (!channel || !message?.ts) return;
+    const attachment = message.attachments?.[0];
+    if (attachment?.blocks) {
+      await this.app.client.chat.update({
+        channel,
+        ts: message.ts,
+        text: ' ',
+        attachments: [{ color: attachment.color, blocks: markPoolAnswered(attachment.blocks, lockedText) }],
+      });
+      return;
+    }
+    if (message.blocks) {
+      await this.app.client.chat.update({
+        channel,
+        ts: message.ts,
+        blocks: markPoolAnswered(message.blocks, lockedText),
       });
     }
   }
@@ -284,6 +326,12 @@ export class SlackAdapter implements MessagingPort {
         attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: poolBlocks(need, copy, need.id) }],
       });
     }
+  }
+
+  async sendClaimAck(personId: string, _need: Need, _outcome: ClaimOutcome, text: string): Promise<void> {
+    const slackUserId = await this.directory.slackIdFor(personId);
+    if (!slackUserId) return;
+    await this.app.client.chat.postMessage({ channel: slackUserId, text });
   }
 
   async openClinicalDoor(userId: string): Promise<void> {

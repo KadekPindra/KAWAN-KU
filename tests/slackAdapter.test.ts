@@ -193,6 +193,38 @@ describe('SlackAdapter', () => {
     });
     expect(posts.map((p) => p.channel)).toEqual(['U1', 'U2']);
   });
+
+  it('klik claim mengunci tombol pool lewat chat.update', async () => {
+    const { app, fire, updates } = fakeApp();
+    const adapter = new SlackAdapter(app, directory);
+    const blocks = poolBlocks({ id: 'need-x' } as Need, { problem: 'p', needFramed: 'n', claimLabel: 'Isi' }, 'need-x');
+
+    await fire({
+      ack: async () => {},
+      action: { action_id: 'claim', value: 'need-x' },
+      body: {
+        user: { id: 'U1' },
+        channel: { id: 'U1' },
+        message: { ts: '222.333', attachments: [{ color: '#2EB67D', blocks }] },
+      },
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ channel: 'U1', ts: '222.333' });
+    const updatedBlocks = JSON.stringify(updates[0].attachments?.[0]?.blocks);
+    expect(updatedBlocks).not.toContain('"action_id":"claim"');
+    expect(updatedBlocks).toContain('Kamu ambil slot ini');
+  });
+
+  it('sendClaimAck DM teks ke satu orang', async () => {
+    const { app, posts } = fakeApp();
+    const adapter = new SlackAdapter(app, directory);
+    await adapter.sendClaimAck('p1', { id: 'need-x' } as Need, 'claimed', 'Makasih ya!');
+    await adapter.sendClaimAck('pX', { id: 'need-x' } as Need, 'claimed', 'Makasih ya!'); // tak dikenal → tak ada DM
+
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toMatchObject({ channel: 'U1', text: 'Makasih ya!' });
+  });
 });
 
 describe('PortalAdapter (stub)', () => {

@@ -1,9 +1,9 @@
 import { App } from '@slack/bolt';
 import type { Person } from '../../domain/types';
 import { createRepository } from '../repositoryFactory';
-import { createGeminiClient, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
+import { createGeminiClient, GeminiClaimAcknowledger, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
 import { ScreeningService } from '../../core/screening';
-import { NeedHarvester } from '../../core/needHarvester';
+import { NeedHarvester, looksLikeNeed } from '../../core/needHarvester';
 import { ClaimService, OutcomeLog } from '../../core/claim';
 import { ClinicalRouter } from '../../core/clinicalRouter';
 import { ReverseMatchService } from '../../core/reverseMatch';
@@ -55,29 +55,17 @@ app.event('team_join', async ({ event }) => {
   await messaging.sendWelcome(person.id);
 });
 
-// Intake needs nyata: /butuh <teks bebas> -> masuk NeedHarvester lewat pipeline weekly yang sudah ada.
-app.command('/butuh', async ({ ack, body, client }) => {
-  await ack();
-  const text = body.text?.trim();
-  if (!text) {
-    // DM, bukan postEphemeral ke channel_id: /butuh bisa dipanggil dari channel mana pun yang
-    // bot belum tentu jadi anggotanya (postEphemeral ke channel asing -> not_in_channel).
-    await client.chat.postMessage({
-      channel: body.user_id,
-      text: 'Ketik kebutuhannya setelah /butuh, ya. Contoh: /butuh 1 lagi buat futsal sore ini di GOR Kampus.',
-    });
-    return;
-  }
-
-  let personId = await directory.personIdFor(body.user_id);
+// Dipakai baik oleh /butuh maupun pesan bebas ke DM bot — satu jalur intake, satu perilaku.
+async function submitNeed(client: App['client'], userId: string, text: string, echoChannelId?: string): Promise<void> {
+  let personId = await directory.personIdFor(userId);
   if (!personId) {
-    const displayName = await resolveDisplayName(client, body.user_id);
-    personId = body.user_id;
+    const displayName = await resolveDisplayName(client, userId);
+    personId = userId;
     const person: Person = {
       id: personId,
       teamId: DEMO_TEAM_ID,
       displayName,
-      slackUserId: body.user_id,
+      slackUserId: userId,
       joinedAt: new Date(),
       interests: [],
       optedIn: true,
@@ -87,18 +75,58 @@ app.command('/butuh', async ({ ack, body, client }) => {
   }
 
   messaging.emit({ kind: 'need', personId, text });
-  await client.chat.postMessage({
-    channel: body.user_id,
-    text: 'Sip, dicatat! Bakal ikut proses pencocokan mingguan.',
-  });
+
+  const dmConfirm = 'Sip, dicatat! Bakal ikut proses pencocokan mingguan.';
+  if (echoChannelId) {
+    // Echo ke channel asal (biar kelihatan sebagai chat, bukan cuma slash command yang lewat)
+    // — fallback ke DM kalau bot belum jadi anggota channel itu (not_in_channel).
+    try {
+      await client.chat.postMessage({
+        channel: echoChannelId,
+        text: `📝 <@${userId}> ajukan kebutuhan: "${text}" — bakal ikut proses pencocokan mingguan.`,
+      });
+      return;
+    } catch {
+      // fallback ke DM di bawah
+    }
+  }
+  await client.chat.postMessage({ channel: userId, text: dmConfirm });
+}
+
+app.command('/butuh', async ({ ack, body, client }) => {
+  await ack();
+  const text = body.text?.trim();
+  if (!text) {
+    await client.chat.postMessage({
+      channel: body.user_id,
+      text: 'Ketik kebutuhannya setelah /butuh, ya. Contoh: /butuh 1 lagi buat futsal sore ini di GOR Kampus.',
+    });
+    return;
+  }
+  await submitNeed(client, body.user_id, text, body.channel_id);
+});
+
+// Pesan bebas (bukan slash command) ke DM bot — hanya diproses kalau kelihatan seperti
+// kebutuhan aktivitas nyata (looksLikeNeed); obrolan yang jelas melenceng diabaikan/ditegur.
+app.message(async ({ message, client, say }) => {
+  const m = message as { subtype?: string; channel_type?: string; user?: string; text?: string };
+  if (m.subtype || m.channel_type !== 'im' || !m.user || !m.text) return;
+
+  const text = m.text.trim();
+  if (!looksLikeNeed(text)) {
+    await say('Kalau ini kebutuhan aktivitas tim, sebutin kegiatan + jumlah orang ya (misal: "butuh 2 orang buat basket sore ini"). Atau pakai /butuh.');
+    return;
+  }
+  await submitNeed(client, m.user, text);
 });
 
 const gemini = createGeminiClient();
 const parser = new GeminiNeedParser(gemini);
 const composer = new GeminiInviteComposer(gemini);
+const acknowledger = new GeminiClaimAcknowledger(gemini);
 const screening = new ScreeningService(repo, messaging);
 const harvester = new NeedHarvester(repo);
-const claim = new ClaimService(repo, new OutcomeLog(repo));
+const claim = new ClaimService(repo, new OutcomeLog(repo), messaging, acknowledger);
 const clinical = new ClinicalRouter(repo, messaging);
 const reverseMatch = new ReverseMatchService(repo, messaging, parser, composer);
 

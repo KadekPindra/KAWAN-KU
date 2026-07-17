@@ -1,13 +1,15 @@
-import type { MessagingPort, InboundEvent } from '../../ports/messaging';
+import type { ClaimOutcome, MessagingPort, InboundEvent } from '../../ports/messaging';
 import type { Cycle, InviteCopy, Need } from '../../domain/types';
 
 type PostedScreening = { personId: string; cycle: Cycle };
 type DeliveredPool = { need: Need; userIds: string[]; copy: InviteCopy };
+type ClaimAck = { personId: string; need: Need; outcome: ClaimOutcome; text: string };
 
 export class InMemoryMessaging implements MessagingPort {
   readonly welcomes: string[] = [];
   readonly postedScreenings: PostedScreening[] = [];
   readonly deliveredPools: DeliveredPool[] = [];
+  readonly claimAcks: ClaimAck[] = [];
   readonly clinicalDoors: string[] = [];
 
   private buffer: InboundEvent[] = [];
@@ -22,6 +24,9 @@ export class InMemoryMessaging implements MessagingPort {
   }
   async deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void> {
     this.deliveredPools.push({ need, userIds, copy });
+  }
+  async sendClaimAck(personId: string, need: Need, outcome: ClaimOutcome, text: string): Promise<void> {
+    this.claimAcks.push({ personId, need, outcome, text });
   }
   async openClinicalDoor(userId: string): Promise<void> {
     this.clinicalDoors.push(userId);

@@ -2,7 +2,7 @@ import type { App } from '@slack/bolt';
 import type { KnownBlock } from '@slack/types';
 import type { Anchor, Cycle, InviteCopy, Need } from '../../domain/types';
 import type { ClaimOutcome, InboundEvent, MessagingPort } from '../../ports/messaging';
-import { CRISIS_RESOURCES } from '../../core/clinicalRouter';
+import { CRISIS_LINE, PSYCHOLOGIST_OPTIONS } from '../../core/clinicalRouter';
 import { config } from '../../config/index';
 import type { SlackDirectory } from './directory';
 
@@ -199,12 +199,28 @@ export async function resolveDisplayName(client: App['client'], slackUserId: str
 }
 
 export function clinicalBlocks(): KnownBlock[] {
-  const list = CRISIS_RESOURCES.map((r) => `• ${r}`).join('\n');
-  return [
-    { type: 'section', text: { type: 'mrkdwn', text: 'Kalau butuh bicara, ini pintu yang selalu terbuka:' } },
-    { type: 'section', text: { type: 'mrkdwn', text: list } },
-    { type: 'actions', elements: [textBtn('Bicara dengan seseorang', 'self_referral')] },
+  const blocks: KnownBlock[] = [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: 'If you ever want to talk things through with a professional, here are a few places to start:',
+      },
+    },
   ];
+
+  for (const o of PSYCHOLOGIST_OPTIONS) {
+    blocks.push({
+      type: 'section',
+      text: { type: 'mrkdwn', text: o.url ? `*<${o.url}|${o.name}>*\n${o.what}` : `*${o.name}*\n${o.what}` },
+    });
+  }
+
+  blocks.push(
+    { type: 'context', elements: [{ type: 'mrkdwn', text: `🆘 Need help right now — ${CRISIS_LINE}` }] },
+    { type: 'actions', elements: [textBtn('Talk to someone', 'self_referral')] },
+  );
+  return blocks;
 }
 
 export class SlackAdapter implements MessagingPort {
@@ -345,7 +361,10 @@ export class SlackAdapter implements MessagingPort {
     const slackUserId = (await this.directory.slackIdFor(userId)) ?? userId;
     await this.app.client.chat.postMessage({
       channel: slackUserId,
-      text: 'Pintu bantuan',
+      text: 'Support options',
+      // tanpa ini Slack menempelkan preview raksasa dari link layanan
+      unfurl_links: false,
+      unfurl_media: false,
       blocks: clinicalBlocks(),
     });
   }

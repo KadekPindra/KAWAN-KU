@@ -15,6 +15,8 @@ function scored(personId: string, cycle: string, score: number): Screening {
     ucla3Score: score,
     lonely: score >= 6,
     deliveredAt: new Date('2026-01-01'),
+    lastSentAt: new Date('2026-01-01'),
+    lastAnsweredAt: new Date('2026-01-02'),
     answeredAt: new Date('2026-01-02'),
     createdAt: new Date('2026-01-01'),
   };

@@ -6,12 +6,6 @@ import { CRISIS_RESOURCES } from '../../core/clinicalRouter';
 import { config } from '../../config/index';
 import type { SlackDirectory } from './directory';
 
-export const UCLA3_ITEMS: Record<1 | 2 | 3, string> = {
-  1: 'Time for a quick screen break! Just out of curiosity, how often do you feel that you lack companionship outside of work lately?',
-  2: 'And how often do you feel left out or excluded by the people around you?',
-  3: "Last one — how often do you feel distant from the people around you these days?",
-};
-
 export const UCLA3_ANCHORS: Record<Anchor, string> = { 1: 'Rarely', 2: 'Sometimes', 3: 'Often' };
 
 export const SCREEN_GREETING = 'Weekly Vibe Check 🌿';
@@ -84,13 +78,13 @@ function textBtn(text: string, actionId: string, value?: string, style?: 'primar
   };
 }
 
-export function questionBlocks(cycle: Cycle, q: 1 | 2 | 3, withGreeting = false): KnownBlock[] {
+export function questionBlocks(cycle: Cycle, q: 1 | 2 | 3, text: string, withGreeting = false): KnownBlock[] {
   const blocks: KnownBlock[] = [];
   if (withGreeting) {
     blocks.push({ type: 'header', text: { type: 'plain_text', text: SCREEN_GREETING, emoji: true } });
   }
   blocks.push(
-    { type: 'section', text: { type: 'mrkdwn', text: UCLA3_ITEMS[q] } },
+    { type: 'section', text: { type: 'mrkdwn', text } },
     {
       type: 'actions',
       elements: ([1, 2, 3] as Anchor[]).map((v) => textBtn(UCLA3_ANCHORS[v], `screen_${q}_${v}`, cycle)),
@@ -304,23 +298,24 @@ export class SlackAdapter implements MessagingPort {
     });
   }
 
-  async postScreening(personId: string, cycle: Cycle): Promise<void> {
+  async postScreeningQuestion(personId: string, cycle: Cycle, q: 1 | 2 | 3, text: string): Promise<void> {
     const r = await this.directory.recipientFor(personId);
     if (!r) return;
-    for (const q of [1, 2, 3] as const) {
-      await this.app.client.chat.postMessage({
-        channel: r.slackUserId,
-        text: UCLA3_ITEMS[q],
-        attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: questionBlocks(cycle, q, q === 1) }],
-      });
-    }
-    if (r.riskConsent) {
-      await this.app.client.chat.postMessage({
-        channel: r.slackUserId,
-        text: RISK_ITEM,
-        attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: riskItemBlocks() }],
-      });
-    }
+    await this.app.client.chat.postMessage({
+      channel: r.slackUserId,
+      text,
+      attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: questionBlocks(cycle, q, text, q === 1) }],
+    });
+  }
+
+  async postRiskItem(personId: string): Promise<void> {
+    const r = await this.directory.recipientFor(personId);
+    if (!r || !r.riskConsent) return;
+    await this.app.client.chat.postMessage({
+      channel: r.slackUserId,
+      text: RISK_ITEM,
+      attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: riskItemBlocks() }],
+    });
   }
 
   async deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void> {

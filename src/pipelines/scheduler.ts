@@ -51,12 +51,6 @@ export class Scheduler {
     await runWeekly(this.deps, this.target.teamId, this.target.week, cycleOf(now), now);
   }
 
-  async openClinicalDoors(): Promise<void> {
-    for (const p of await this.deps.repo.listPeople(this.target.teamId)) {
-      await this.deps.messaging.openClinicalDoor(p.id);
-    }
-  }
-
   start(): void {
     this.timers.push(
       setInterval(() => {

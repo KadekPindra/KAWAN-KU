@@ -1,13 +1,14 @@
 import type { ClaimOutcome, MessagingPort, InboundEvent } from '../../ports/messaging';
 import type { Cycle, InviteCopy, Need } from '../../domain/types';
 
-type PostedScreening = { personId: string; cycle: Cycle };
+type PostedQuestion = { personId: string; cycle: Cycle; q: 1 | 2 | 3; text: string };
 type DeliveredPool = { need: Need; userIds: string[]; copy: InviteCopy };
 type ClaimAck = { personId: string; need: Need; outcome: ClaimOutcome; text: string };
 
 export class InMemoryMessaging implements MessagingPort {
   readonly welcomes: string[] = [];
-  readonly postedScreenings: PostedScreening[] = [];
+  readonly postedQuestions: PostedQuestion[] = [];
+  readonly riskItems: string[] = [];
   readonly deliveredPools: DeliveredPool[] = [];
   readonly claimAcks: ClaimAck[] = [];
   readonly clinicalDoors: string[] = [];
@@ -19,8 +20,11 @@ export class InMemoryMessaging implements MessagingPort {
   async sendWelcome(personId: string): Promise<void> {
     this.welcomes.push(personId);
   }
-  async postScreening(personId: string, cycle: Cycle): Promise<void> {
-    this.postedScreenings.push({ personId, cycle });
+  async postScreeningQuestion(personId: string, cycle: Cycle, q: 1 | 2 | 3, text: string): Promise<void> {
+    this.postedQuestions.push({ personId, cycle, q, text });
+  }
+  async postRiskItem(personId: string): Promise<void> {
+    this.riskItems.push(personId);
   }
   async deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void> {
     this.deliveredPools.push({ need, userIds, copy });

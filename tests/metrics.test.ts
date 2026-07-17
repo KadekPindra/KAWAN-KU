@@ -16,6 +16,8 @@ function answered(personId: string, score: number): Screening {
     ucla3Score: score,
     lonely: score >= config.LONELY_THRESHOLD,
     deliveredAt: new Date('2026-06-01'),
+    lastSentAt: new Date('2026-06-01'),
+    lastAnsweredAt: new Date('2026-06-03'),
     answeredAt: new Date('2026-06-03'),
     createdAt: new Date('2026-06-01'),
   };

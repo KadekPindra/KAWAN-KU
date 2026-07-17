@@ -6,8 +6,12 @@ export class PortalAdapter implements MessagingPort {
     throw new Error('NotImplemented: PortalAdapter.sendWelcome');
   }
 
-  async postScreening(_personId: string, _cycle: Cycle): Promise<void> {
-    throw new Error('NotImplemented: PortalAdapter.postScreening');
+  async postScreeningQuestion(_personId: string, _cycle: Cycle, _q: 1 | 2 | 3, _text: string): Promise<void> {
+    throw new Error('NotImplemented: PortalAdapter.postScreeningQuestion');
+  }
+
+  async postRiskItem(_personId: string): Promise<void> {
+    throw new Error('NotImplemented: PortalAdapter.postRiskItem');
   }
 
   async deliverPool(_need: Need, _userIds: string[], _copy: InviteCopy): Promise<void> {

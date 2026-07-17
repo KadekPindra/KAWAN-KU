@@ -125,7 +125,7 @@ describe('block builders', () => {
   });
 
   it('markQuestionAnswered mengganti baris tombol pertanyaan itu jadi teks terkunci', () => {
-    const blocks = questionBlocks('2026-06', 1);
+    const blocks = questionBlocks('2026-06', 1, 'Gimana kabarnya belakangan ini?');
     const locked = markQuestionAnswered(blocks, 1, 3);
     const actions = JSON.stringify(locked[1]);
     expect(actions).not.toContain('screen_1_');
@@ -166,22 +166,30 @@ describe('SlackAdapter', () => {
     expect(JSON.stringify(posts[0].blocks)).toContain('Dewi Anjani');
   });
 
-  it('postScreening DM ke satu orang (per orang, bukan broadcast), blocks dibungkus attachment hijau', async () => {
+  it('postScreeningQuestion DM 1 pertanyaan ke satu orang (per orang, bukan broadcast), blocks dibungkus attachment hijau', async () => {
     const { app, posts } = fakeApp();
     const adapter = new SlackAdapter(app, directory);
-    await adapter.postScreening('p1', '2026-06');
-    await adapter.postScreening('p2', '2026-06');
-    await adapter.postScreening('pX', '2026-06'); // tak dikenal → tak ada DM
-    // p1 (riskConsent) dpt 3 pertanyaan + 1 risk item; p2 dpt 3 pertanyaan saja.
-    expect(posts.map((p) => p.channel)).toEqual(['U1', 'U1', 'U1', 'U1', 'U2', 'U2', 'U2']);
+    await adapter.postScreeningQuestion('p1', '2026-06', 1, 'Gimana kabarnya belakangan ini?');
+    await adapter.postScreeningQuestion('p2', '2026-06', 1, 'Gimana kabarnya belakangan ini?');
+    await adapter.postScreeningQuestion('pX', '2026-06', 1, 'Gimana kabarnya belakangan ini?'); // tak dikenal → tak ada DM
+    expect(posts.map((p) => p.channel)).toEqual(['U1', 'U2']);
     expect(posts[0].attachments?.[0]?.blocks).toBeDefined();
     expect(posts[0].blocks).toBeUndefined();
+  });
+
+  it('postRiskItem cuma ke yang riskConsent', async () => {
+    const { app, posts } = fakeApp();
+    const adapter = new SlackAdapter(app, directory);
+    await adapter.postRiskItem('p1'); // riskConsent: true
+    await adapter.postRiskItem('p2'); // riskConsent: false -> tak ada DM
+    await adapter.postRiskItem('pX'); // tak dikenal -> tak ada DM
+    expect(posts.map((p) => p.channel)).toEqual(['U1']);
   });
 
   it('menjawab pertanyaan (attachments-wrapped) mengunci tombol lewat chat.update', async () => {
     const { app, fire, updates } = fakeApp();
     const adapter = new SlackAdapter(app, directory);
-    const blocks = questionBlocks('2026-06', 1);
+    const blocks = questionBlocks('2026-06', 1, 'Gimana kabarnya belakangan ini?');
 
     await fire({
       ack: async () => {},
@@ -248,7 +256,8 @@ describe('PortalAdapter (stub)', () => {
   it('semua method throw NotImplemented', async () => {
     const portal = new PortalAdapter();
     await expect(portal.sendWelcome('p1')).rejects.toThrow('NotImplemented');
-    await expect(portal.postScreening('T', '2026-06')).rejects.toThrow('NotImplemented');
+    await expect(portal.postScreeningQuestion('T', '2026-06', 1, 'x')).rejects.toThrow('NotImplemented');
+    await expect(portal.postRiskItem('p1')).rejects.toThrow('NotImplemented');
     await expect(
       portal.deliverPool({ id: 'n' } as Need, ['p1'], { problem: 'p', needFramed: 'x', claimLabel: 'y' }),
     ).rejects.toThrow('NotImplemented');

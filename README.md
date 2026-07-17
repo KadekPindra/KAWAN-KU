@@ -27,6 +27,7 @@ cp .env.example .env
 | Var | Untuk | Default |
 |---|---|---|
 | `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_SIGNING_SECRET` | jalur Slack (`slack`, `slack:demo`) | — |
+| `INSTITUTION_NAME` | nama institusi di pesan sambutan `team_join` | `kampus/kantor kamu` |
 | `GEMINI_API_KEY` | LLM parse/compose (ada fallback template) | — |
 | `KAWAN_LLM=template` | paksa offline (skip LLM, pakai template) | off |
 | `KAWAN_REPO=postgres` | pakai Postgres, bukan in-memory | in-memory |
@@ -69,7 +70,7 @@ npm run slack
 
 ### 5. Slack — DEMO panggung (`/kawanku`)
 
-Entrypoint terpisah dengan **satu** trigger manual untuk panggung: ketik `/kawanku` → bot kirim 3 pertanyaan UCLA-3 sekali → **langsung** menawarkan aktivitas (need-framed).
+Entrypoint terpisah dengan **satu** trigger manual untuk panggung: ketik `/kawanku` → bot kirim sambutan (fitur `team_join`) → 1 pertanyaan UCLA-3 → setelah dijawab, **langsung** menawarkan aktivitas (need-framed).
 
 ```bash
 npm run slack:demo

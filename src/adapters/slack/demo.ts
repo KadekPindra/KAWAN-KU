@@ -1,5 +1,6 @@
 import { App } from '@slack/bolt';
-import type { Need } from '../../domain/types';
+import type { Need, Person } from '../../domain/types';
+import { config } from '../../config/index';
 import { createRepository } from '../repositoryFactory';
 import { createGeminiClient, GeminiInviteComposer } from '../llm/gemini';
 import { ScreeningService } from '../../core/screening';
@@ -10,7 +11,7 @@ import { handleInbound } from '../../pipelines/continuous';
 import { cycleOf } from '../../pipelines/scheduler';
 import { DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
 import { RepoSlackDirectory } from './directory';
-import { SlackAdapter, screeningBlocks, poolBlocks } from './slackAdapter';
+import { SlackAdapter, questionBlocks, poolBlocks, welcomeBlocks } from './slackAdapter';
 
 const { SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_SIGNING_SECRET } = process.env;
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
@@ -58,25 +59,45 @@ app.command('/kawanku', async ({ ack, body, client }) => {
   const channel = body.user_id;
   const cycle = cycleOf(new Date());
 
+  const info = await client.users.info({ user: body.user_id });
+  const displayName = info.user?.profile?.real_name || info.user?.real_name || info.user?.name || 'Kamu';
+
+  if (!(await directory.personIdFor(body.user_id))) {
+    const person: Person = {
+      id: body.user_id,
+      teamId: DEMO_TEAM_ID,
+      displayName,
+      slackUserId: body.user_id,
+      joinedAt: new Date(),
+      interests: [],
+      optedIn: true,
+      riskConsent: false,
+    };
+    await repo.savePerson(person);
+  }
+
   await client.chat.postMessage({
     channel,
-    text: 'Cek singkat (3 pertanyaan)',
-    blocks: screeningBlocks(cycle, false),
+    text: 'Selamat datang',
+    blocks: welcomeBlocks(displayName, config.INSTITUTION_NAME),
   });
 
-  const copy = await composer.compose(demoNeed);
   await client.chat.postMessage({
     channel,
-    text: copy.needFramed,
-    blocks: poolBlocks(copy, demoNeed.id),
+    text: 'Cek singkat (1 pertanyaan)',
+    blocks: questionBlocks(cycle, 1),
   });
 });
 
 void (async () => {
   for await (const event of messaging.receiveResponse()) {
     await handleInbound({ teamId: DEMO_TEAM_ID, week: DEMO_WEEK, screening, harvester, claim, clinical }, event);
+    if (event.kind === 'screenAnswer' && event.q === 1) {
+      const copy = await composer.compose(demoNeed);
+      await messaging.deliverPool(demoNeed, [event.personId], copy);
+    }
   }
 })();
 
 await app.start();
-console.log('KAWAN DEMO jalan (Socket Mode). Ketik /kawanku untuk: 3 pertanyaan → langsung tawaran aktivitas.');
+console.log('KAWAN DEMO jalan (Socket Mode). Ketik /kawanku untuk: sambutan → 1 pertanyaan → langsung tawaran aktivitas.');

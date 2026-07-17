@@ -11,7 +11,7 @@ import { handleInbound } from '../../pipelines/continuous';
 import { cycleOf } from '../../pipelines/scheduler';
 import { DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
 import { RepoSlackDirectory } from './directory';
-import { SlackAdapter, questionBlocks, poolBlocks, welcomeBlocks } from './slackAdapter';
+import { SlackAdapter, questionBlocks, poolBlocks, welcomeBlocks, resolveDisplayName } from './slackAdapter';
 
 const { SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_SIGNING_SECRET } = process.env;
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
@@ -59,8 +59,7 @@ app.command('/kawanku', async ({ ack, body, client }) => {
   const channel = body.user_id;
   const cycle = cycleOf(new Date());
 
-  const info = await client.users.info({ user: body.user_id });
-  const displayName = info.user?.profile?.real_name || info.user?.real_name || info.user?.name || 'Kamu';
+  const displayName = await resolveDisplayName(client, body.user_id);
 
   if (!(await directory.personIdFor(body.user_id))) {
     const person: Person = {

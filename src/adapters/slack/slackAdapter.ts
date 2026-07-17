@@ -132,6 +132,15 @@ export function welcomeBlocks(displayName: string, institutionName: string): Kno
   ];
 }
 
+export async function resolveDisplayName(client: App['client'], slackUserId: string): Promise<string> {
+  try {
+    const info = await client.users.info({ user: slackUserId });
+    return info.user?.profile?.real_name || info.user?.real_name || info.user?.name || 'Kamu';
+  } catch {
+    return 'Kamu';
+  }
+}
+
 export function clinicalBlocks(): KnownBlock[] {
   const list = CRISIS_RESOURCES.map((r) => `• ${r}`).join('\n');
   return [
@@ -167,8 +176,7 @@ export class SlackAdapter implements MessagingPort {
   async sendWelcome(personId: string): Promise<void> {
     const slackUserId = await this.directory.slackIdFor(personId);
     if (!slackUserId) return;
-    const info = await this.app.client.users.info({ user: slackUserId });
-    const displayName = info.user?.profile?.real_name || info.user?.real_name || info.user?.name || 'kamu';
+    const displayName = await resolveDisplayName(this.app.client, slackUserId);
     await this.app.client.chat.postMessage({
       channel: slackUserId,
       text: 'Selamat datang',

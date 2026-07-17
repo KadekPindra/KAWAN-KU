@@ -1,6 +1,6 @@
 # KAWAN
 
-**Garuda Hacks 7.0 · Health track** — *automated link worker*: skrining kesepian UCLA-3 bulanan yang proaktif, deteksi deterministik, lalu merutekan orang ke aktivitas komunitas nyata dengan bingkai **kebutuhan** ("tim futsal kurang 1 orang"), bukan ajakan. Hidup di dalam Slack, bukan aplikasi baru.
+**Garuda Hacks 7.0 · Health track**  _automated link worker_: skrining kesepian UCLA-3 bulanan yang proaktif, deteksi deterministik, lalu merutekan orang ke aktivitas komunitas nyata dengan bingkai **kebutuhan** ("tim futsal kurang 1 orang"), bukan ajakan. Hidup di dalam Slack, bukan aplikasi baru.
 
 Sumber kebenaran desain: [kawan-pitch-detail.md](kawan-pitch-detail.md) (why) · [kawan-tech-spec.md](kawan-tech-spec.md) (how) · [kawan-progress-plan.md](kawan-progress-plan.md) (progress).
 
@@ -16,6 +16,34 @@ Sumber kebenaran desain: [kawan-pitch-detail.md](kawan-pitch-detail.md) (why) ·
 npm install
 ```
 
+---
+
+## Cara Akses Slack Workspace
+
+### 1. Join workspace
+
+Klik invite link berikut untuk bergabung ke workspace Slack demo:
+
+[https://join.slack.com/t/kawan-ku/shared_invite/zt-44kaexdwg-qUiLJ56FUCqUYEXq2MQg5Q](https://join.slack.com/t/kawan-ku/shared_invite/zt-44kaexdwg-qUiLJ56FUCqUYEXq2MQg5Q)
+
+### 2. Tunggu sambutan bot
+
+Workspace ini jalan lewat `npm run slack` (mode proaktif produksi) skrining tidak dipicu manual. Begitu bergabung, bot KAWAN otomatis mengirim DM sambutan (`team_join`) diikuti 3 pertanyaan skrining UCLA-3 satu per satu. Jawab langsung lewat tombol di DM.
+
+### 3. Submit kebutuhan lewat `/butuh`
+
+Masuk ke salah satu channel, lalu ketik perintah `/butuh` diikuti teks kebutuhanmu, misalnya:
+
+```
+/butuh saya butuh 3 orang pemain bola basket
+```
+
+Kebutuhan ini masuk ke antrean dan akan diproses bersama batch-match mingguan berikutnya (`ROUTE_TICK_MS`) — bukan dijawab langsung saat itu juga.
+
+### 4. Cek DM untuk penawaran kebutuhan
+
+Kembali ke DM dengan bot KAWAN. Kalau kamu cocok dengan sebuah kebutuhan terbuka (termasuk yang baru kamu submit lewat `/butuh`), bot akan mengirim info bahwa ada orang yang sedang membutuhkan orang lain untuk suatu aktivitas dibingkai sebagai kebutuhan ("tim futsal kurang 1 orang"), bukan ajakan.
+
 Salin env template lalu isi sesuai kebutuhan:
 
 ```bash
@@ -24,21 +52,19 @@ cp .env.example .env
 
 `.env` (semua opsional kecuali saat memakai jalur terkait):
 
-| Var | Untuk | Default |
-|---|---|---|
-| `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_SIGNING_SECRET` | jalur Slack (`slack`, `slack:demo`) | — |
-| `INSTITUTION_NAME` | nama institusi di pesan sambutan `team_join` | `kampus/kantor kamu` |
-| `GEMINI_API_KEY` | LLM parse/compose (ada fallback template) | — |
-| `KAWAN_LLM=template` | paksa offline (skip LLM, pakai template) | off |
-| `KAWAN_REPO=postgres` | pakai Postgres, bukan in-memory | in-memory |
-| `DATABASE_URL` | koneksi Postgres | `postgresql://kawan:kawan@localhost:5432/kawan` |
-| `SCREEN_TICK_MS`, `ROUTE_TICK_MS` | interval scheduler proaktif | 1 jam · 1 minggu |
-
----
+| Var                                                          | Untuk                                        | Default                                         |
+| ------------------------------------------------------------ | -------------------------------------------- | ----------------------------------------------- |
+| `SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN`, `SLACK_SIGNING_SECRET` | jalur Slack (`slack`, `slack:demo`)          | —                                               |
+| `INSTITUTION_NAME`                                           | nama institusi di pesan sambutan `team_join` | `kampus/kantor kamu`                            |
+| `GEMINI_API_KEY`                                             | LLM parse/compose (ada fallback template)    | —                                               |
+| `KAWAN_LLM=template`                                         | paksa offline (skip LLM, pakai template)     | off                                             |
+| `KAWAN_REPO=postgres`                                        | pakai Postgres, bukan in-memory              | in-memory                                       |
+| `DATABASE_URL`                                               | koneksi Postgres                             | `postgresql://kawan:kawan@localhost:5432/kawan` |
+| `SCREEN_TICK_MS`, `ROUTE_TICK_MS`                            | interval scheduler proaktif                  | 1 jam · 1 minggu                                |
 
 ## Cara run
 
-### 1. Demo headless (paling cepat — tanpa Slack/LLM/DB)
+### 1. Demo headless (paling cepat tanpa Slack/LLM/DB)
 
 Seluruh alur (deteksi → routing need-framed → claim → klinis → agregat) tercetak di konsol:
 
@@ -60,23 +86,13 @@ npm run seed            # cetak tabel tim demo + open needs
 npm run metrics         # tampilan institusi (agregat k-anon; tak ada data per-orang)
 ```
 
-### 4. Slack — sistem proaktif (produksi)
+### 4. Slack sistem proaktif (produksi)
 
 Scheduler menjalankan sendiri screen-tick + weekly-route; **tak ada perintah manual** (sesuai desain).
 
 ```bash
 npm run slack
 ```
-
-### 5. Slack — DEMO panggung (`/kawanku`)
-
-Entrypoint terpisah dengan **satu** trigger manual untuk panggung: ketik `/kawanku` → bot kirim sambutan (fitur `team_join`) → 1 pertanyaan UCLA-3 → setelah dijawab, **langsung** menawarkan aktivitas (need-framed).
-
-```bash
-npm run slack:demo
-```
-
-> Trigger `/kawanku` sengaja dipisah dari `npm run slack` supaya jalur produksi tetap murni proaktif. Daftarkan slash command `/kawanku` di konfigurasi Slack app kamu (Socket Mode + interactivity aktif).
 
 ---
 
@@ -116,13 +132,12 @@ Set `KAWAN_REPO=postgres` di depan perintah (atau di `.env`):
 
 ```bash
 KAWAN_REPO=postgres npm run slack        # sistem proaktif, data di Postgres
-KAWAN_REPO=postgres npm run slack:demo    # demo /kawanku, data di Postgres
+
 KAWAN_REPO=postgres npm run metrics       # agregat dibaca dari Postgres
 ```
 
-> Catatan privasi (§8): tabel `institution_metrics` **tak punya `person_id`** dan tak pernah join ke `people` — secara struktural tak ada tempat melihat individu. Baris disuppress bila responder < `K_ANON`.
 
----
+
 
 ## Struktur (hexagonal — core tanpa impor SDK Slack)
 
@@ -140,11 +155,11 @@ tests/         79+ unit test (deterministik, tanpa Slack/DB/LLM)
 
 ## Skrip npm
 
-| Skrip | Fungsi |
-|---|---|
-| `demo` | alur end-to-end headless di konsol |
-| `slack` | Slack, **proaktif** (scheduler, tanpa trigger manual) |
-| `slack:demo` | Slack, trigger demo `/kawanku` |
-| `seed` / `metrics` | seed in-memory / tampilan agregat |
-| `db:seed` | buat skema Postgres + seed |
-| `typecheck` / `test` | tsc --noEmit / vitest |
+| Skrip                | Fungsi                                                |
+| -------------------- | ----------------------------------------------------- |
+| `demo`               | alur end-to-end headless di konsol                    |
+| `slack`              | Slack, **proaktif** (scheduler, tanpa trigger manual) |
+| `slack:demo`         | Slack, trigger demo `/kawanku`                        |
+| `seed` / `metrics`   | seed in-memory / tampilan agregat                     |
+| `db:seed`            | buat skema Postgres + seed                            |
+| `typecheck` / `test` | tsc --noEmit / vitest                                 |

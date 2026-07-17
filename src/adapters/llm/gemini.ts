@@ -1,7 +1,9 @@
 import type { Schema } from '@google/genai';
 import type { Effort, Need, ParsedNeed } from '../../domain/types';
+import type { ClaimOutcome } from '../../ports/messaging';
 import { NeedParser, TemplateNeedParser } from '../../core/needParser';
 import { InviteComposer, InviteCopy, TemplateInviteComposer } from '../../core/inviteComposer';
+import { ClaimAcknowledger, TemplateClaimAcknowledger } from '../../core/claimAcknowledger';
 
 const MODEL = 'gemini-2.5-flash';
 
@@ -169,5 +171,45 @@ export class GeminiInviteComposer implements InviteComposer {
       }
     }
     return this.fallback.compose(need);
+  }
+}
+
+const ACK_SYSTEM = [
+  'Kamu menulis SATU kalimat singkat dalam Bahasa Indonesia, santai, untuk seseorang yang baru saja merespons tawaran slot sebuah aktivitas tim.',
+  'outcome="claimed": ucapkan apresiasi/terima kasih karena sudah bersedia mengisi kebutuhan tim.',
+  'outcome="declined": tanggapi santai dan tidak menghakimi, terima keputusannya tanpa memaksa.',
+  'outcome="full": beri tahu dengan ramah bahwa slotnya sudah keburu penuh duluan.',
+  'Jangan sebut kesepian, skrining, atau kondisi personal siapa pun.',
+  'Keluarkan JSON: { "text": "..." }.',
+].join(' ');
+
+const ACK_SCHEMA: Record<string, unknown> = {
+  type: 'OBJECT',
+  properties: { text: { type: 'STRING' } },
+  required: ['text'],
+};
+
+export class GeminiClaimAcknowledger implements ClaimAcknowledger {
+  constructor(
+    private readonly client: GeminiClient | null,
+    private readonly fallback: ClaimAcknowledger = new TemplateClaimAcknowledger(),
+  ) {}
+
+  async acknowledge(need: Need, outcome: ClaimOutcome): Promise<string> {
+    if (this.client) {
+      try {
+        const out = await this.client.generate({
+          system: ACK_SYSTEM,
+          prompt: `outcome=${outcome}; ${describeNeed(need)}`,
+          responseSchema: ACK_SCHEMA,
+        });
+        const parsed = JSON.parse(out) as { text?: unknown };
+        const text = typeof parsed.text === 'string' ? parsed.text.trim() : '';
+        if (text) return text;
+      } catch {
+        // jatuh ke template
+      }
+    }
+    return this.fallback.acknowledge(need, outcome);
   }
 }

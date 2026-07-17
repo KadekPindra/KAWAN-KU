@@ -86,8 +86,6 @@ create table if not exists risk_events (
   created_at timestamptz not null
 );
 
--- PRIVACY WALL §8: tanpa kolom person_id. Query institusi hanya baca tabel ini,
--- tak pernah join ke people. Angka disuppress (null) di bawah K_ANON responder.
 create table if not exists institution_metrics (
   team_id text not null,
   period text not null,

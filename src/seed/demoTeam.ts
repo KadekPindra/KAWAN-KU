@@ -10,15 +10,10 @@ interface Spec {
   id: string;
   name: string;
   interests: string[];
-  scores: (number | null)[]; // per DEMO_CYCLES; null = non-response
+  scores: (number | null)[]; 
   riskConsent: boolean;
 }
 
-// Skor dirancang agar deteksi menghasilkan narasi tetap (disclosed on stage):
-//   dewi/sari  = baru menembus band lonely (worsening)
-//   rangga     = lonely 3 siklus memburuk -> clinical_suggest
-//   bagus      = lonely 3 siklus tapi membaik -> flagged, TIDAK di-nudge klinis
-//   putu/kadek = non-response (sinyal, bukan data hilang)
 const SPECS: Spec[] = [
   { id: 'dewi', name: 'Dewi', interests: ['futsal', 'lari'], scores: [5, 6, 8], riskConsent: true },
   { id: 'rangga', name: 'Rangga', interests: ['basket', 'ngoding'], scores: [6, 7, 8], riskConsent: true },

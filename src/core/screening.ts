@@ -36,8 +36,6 @@ export class ScreeningService {
     private readonly messaging: MessagingPort,
   ) {}
 
-  // §5.1.1 — kirim hanya ke orang yang jatuh tempo (next_due_at diturunkan dari riwayat),
-  // per orang, bukan broadcast. Idempoten per cycle: skip yang sudah punya screening.
   async deliver(
     teamId: string,
     cycle: Cycle,
@@ -55,7 +53,6 @@ export class ScreeningService {
     }
   }
 
-  // Jatuh tempo bila now >= next_due_at. Orang tanpa riwayat pengiriman = langsung due (cold start).
   async isDue(teamId: string, personId: string, now: Date, cfg: Config = config): Promise<boolean> {
     const history = (await this.repo.listScreeningsForPerson(teamId, personId)).sort((a, b) =>
       a.cycle < b.cycle ? -1 : a.cycle > b.cycle ? 1 : 0,

@@ -5,10 +5,6 @@ import type { NeedParser } from './needParser';
 import type { InviteComposer } from './inviteComposer';
 import { bestMatch } from './batchMatcher';
 
-// Nempel di alur survey: begitu screening seseorang selesai (3/3 terjawab), cek ada need
-// terbuka yang cocok di timnya dan tawarkan langsung — di luar jadwal weekly route tick,
-// yang tetap jalan seperti biasa untuk sisa roster. Silent kalau tak ada yang cocok atau
-// sudah pernah ditawari need itu (tak ada re-nudge).
 export class ReverseMatchService {
   constructor(
     private readonly repo: Repository,

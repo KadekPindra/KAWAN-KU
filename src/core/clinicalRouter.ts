@@ -2,7 +2,6 @@ import type { Cycle, RiskSource } from '../domain/types';
 import type { Repository } from '../ports/repository';
 import type { MessagingPort } from '../ports/messaging';
 
-// TODO: konfirmasi kontak resmi sebelum demo (SEJIWA/Into The Light/konselor kampus).
 export const CRISIS_RESOURCES = [
   'Kemenkes SEJIWA — 119 ext 8',
   'Into The Light Indonesia — intothelightid.org',

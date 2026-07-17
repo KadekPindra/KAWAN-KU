@@ -2,9 +2,6 @@ import { config, type Config } from '../config/index';
 import type { Cycle, InstitutionMetrics } from '../domain/types';
 import type { Repository } from '../ports/repository';
 
-// institution_metrics TIDAK PERNAH join ke people. Rollup membaca screenings/invites
-// hanya untuk agregasi; baris yang disimpan tak memuat data per-orang. Di bawah
-// K_ANON responder, angka disuppress (null) — bukan diestimasi.
 export class MetricsAggregator {
   constructor(private readonly repo: Repository) {}
 

@@ -74,23 +74,36 @@ async function submitNeed(client: App['client'], userId: string, text: string, e
     await repo.savePerson(person);
   }
 
-  messaging.emit({ kind: 'need', personId, text });
-
   const dmConfirm = 'Sip, dicatat! Bakal ikut proses pencocokan mingguan.';
+  let sourceUrl: string | undefined;
+  let echoed = false;
   if (echoChannelId) {
     // Echo ke channel asal (biar kelihatan sebagai chat, bukan cuma slash command yang lewat)
     // — fallback ke DM kalau bot belum jadi anggota channel itu (not_in_channel).
     try {
-      await client.chat.postMessage({
+      const posted = await client.chat.postMessage({
         channel: echoChannelId,
         text: `📝 <@${userId}> ajukan kebutuhan: "${text}" — bakal ikut proses pencocokan mingguan.`,
       });
-      return;
+      echoed = true;
+      // Link ke pesan asli — bukti buat sisi penerima reverse-match bahwa kebutuhan ini nyata.
+      if (posted.channel && posted.ts) {
+        try {
+          const permalink = await client.chat.getPermalink({ channel: posted.channel, message_ts: posted.ts });
+          sourceUrl = permalink.permalink;
+        } catch {
+          // tak apa, tawaran tetap jalan tanpa link
+        }
+      }
     } catch {
       // fallback ke DM di bawah
     }
   }
-  await client.chat.postMessage({ channel: userId, text: dmConfirm });
+  if (!echoed) {
+    await client.chat.postMessage({ channel: userId, text: dmConfirm });
+  }
+
+  messaging.emit({ kind: 'need', personId, text, sourceUrl });
 }
 
 app.command('/butuh', async ({ ack, body, client }) => {
@@ -143,6 +156,34 @@ void (async () => {
 })();
 
 await app.start();
+
+async function bootstrapRoster(): Promise<void> {
+  let cursor: string | undefined;
+  let added = 0;
+  do {
+    const res = await app.client.users.list({ cursor, limit: 200 });
+    for (const m of res.members ?? []) {
+      if (!m.id || m.is_bot || m.deleted || m.id === 'USLACKBOT') continue;
+      if (await directory.personIdFor(m.id)) continue;
+      const person: Person = {
+        id: m.id,
+        teamId: DEMO_TEAM_ID,
+        displayName: m.profile?.real_name || m.real_name || m.name || m.id,
+        slackUserId: m.id,
+        joinedAt: new Date(),
+        interests: [],
+        optedIn: true,
+        riskConsent: false,
+      };
+      await repo.savePerson(person);
+      added++;
+    }
+    cursor = res.response_metadata?.next_cursor || undefined;
+  } while (cursor);
+  console.log(`[bootstrap] roster terisi: ${added} member workspace didaftarkan`);
+}
+
+await bootstrapRoster();
 
 await scheduler.openClinicalDoors();
 await scheduler.screenTick();

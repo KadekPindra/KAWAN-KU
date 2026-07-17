@@ -187,12 +187,23 @@ async function submitNeed(client: App['client'], userId: string, text: string, e
   }
 
   const dmConfirm = `Dicatat: "${text}" — lagi dicocokkan ke tim, tunggu sebentar ya.`;
+  let sourceUrl: string | undefined;
   if (echoChannelId) {
     try {
-      await client.chat.postMessage({
+      const posted = await client.chat.postMessage({
         channel: echoChannelId,
         text: `📝 <@${userId}> ajukan kebutuhan: "${text}" — lagi dicocokkan ke tim.`,
       });
+      // Link ke pesan asli — bukti buat sisi penerima reverse-match bahwa kebutuhan ini nyata.
+      // Kalau gagal (scope kurang, dsb.) sourceUrl cukup diam-diam kosong, tak menghalangi alur.
+      if (posted.channel && posted.ts) {
+        try {
+          const permalink = await client.chat.getPermalink({ channel: posted.channel, message_ts: posted.ts });
+          sourceUrl = permalink.permalink;
+        } catch {
+          // tak apa, tawaran tetap jalan tanpa link
+        }
+      }
     } catch {
       await client.chat.postMessage({ channel: userId, text: dmConfirm });
     }
@@ -200,7 +211,7 @@ async function submitNeed(client: App['client'], userId: string, text: string, e
     await client.chat.postMessage({ channel: userId, text: dmConfirm });
   }
 
-  await harvester.collect(DEMO_TEAM_ID, 'member', text, DEMO_WEEK);
+  await harvester.collect(DEMO_TEAM_ID, 'member', text, DEMO_WEEK, { authorPersonId: userId, sourceUrl });
   const result = await runWeekly({ repo, messaging, parser, composer }, DEMO_TEAM_ID, DEMO_WEEK, cycleOf(new Date()));
   if (result.delivered.length === 0) {
     await client.chat.postMessage({

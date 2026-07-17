@@ -36,11 +36,13 @@ function fakeApp() {
   return { app, posts, fire: (a: Parameters<ActionHandler>[0]) => handler!(a) };
 }
 
+const RECIPIENTS = [
+  { personId: 'p1', slackUserId: 'U1', riskConsent: true },
+  { personId: 'p2', slackUserId: 'U2', riskConsent: false },
+];
 const directory: SlackDirectory = {
-  recipients: async () => [
-    { personId: 'p1', slackUserId: 'U1', riskConsent: true },
-    { personId: 'p2', slackUserId: 'U2', riskConsent: false },
-  ],
+  recipients: async () => RECIPIENTS,
+  recipientFor: async (pid) => RECIPIENTS.find((r) => r.personId === pid) ?? null,
   slackIdFor: async (pid) => (pid === 'p1' ? 'U1' : pid === 'p2' ? 'U2' : null),
   personIdFor: async (sid) => (sid === 'U1' ? 'p1' : null),
 };
@@ -109,10 +111,12 @@ describe('SlackAdapter', () => {
     expect(value).toEqual<InboundEvent>({ kind: 'selfReferral', personId: 'sentinel' });
   });
 
-  it('postScreening DM tiap recipient', async () => {
+  it('postScreening DM ke satu orang (per orang, bukan broadcast)', async () => {
     const { app, posts } = fakeApp();
     const adapter = new SlackAdapter(app, directory);
-    await adapter.postScreening('T', '2026-06');
+    await adapter.postScreening('p1', '2026-06');
+    await adapter.postScreening('p2', '2026-06');
+    await adapter.postScreening('pX', '2026-06'); // tak dikenal → tak ada DM
     expect(posts.map((p) => p.channel)).toEqual(['U1', 'U2']);
   });
 

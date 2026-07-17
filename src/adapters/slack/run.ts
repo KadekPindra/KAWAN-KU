@@ -5,9 +5,8 @@ import { ScreeningService } from '../../core/screening';
 import { NeedHarvester } from '../../core/needHarvester';
 import { ClaimService, OutcomeLog } from '../../core/claim';
 import { ClinicalRouter } from '../../core/clinicalRouter';
-import { runMonthly } from '../../pipelines/monthly';
-import { runWeekly } from '../../pipelines/weekly';
 import { handleInbound } from '../../pipelines/continuous';
+import { Scheduler } from '../../pipelines/scheduler';
 import { DEMO_CYCLES, DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
 import { RepoSlackDirectory } from './directory';
 import { SlackAdapter } from './slackAdapter';
@@ -17,6 +16,15 @@ if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   console.error('Butuh SLACK_BOT_TOKEN + SLACK_APP_TOKEN (Socket Mode). Isi .env dulu.');
   process.exit(1);
 }
+
+function num(name: string, fallback: number): number {
+  const raw = process.env[name];
+  const n = raw ? Number(raw) : NaN;
+  return Number.isFinite(n) ? n : fallback;
+}
+
+const HOUR = 60 * 60 * 1000;
+const WEEK = 7 * 24 * HOUR;
 
 const cycle = DEMO_CYCLES[DEMO_CYCLES.length - 1];
 
@@ -44,23 +52,11 @@ const harvester = new NeedHarvester(repo);
 const claim = new ClaimService(repo, new OutcomeLog(repo));
 const clinical = new ClinicalRouter(repo, messaging);
 
-app.command('/kawan-screen', async ({ ack, respond }) => {
-  await ack();
-  await screening.deliver(DEMO_TEAM_ID, cycle);
-  await runMonthly({ repo, messaging }, DEMO_TEAM_ID, cycle);
-  await respond('Skrining bulanan dikirim + deteksi dijalankan.');
-});
-
-app.command('/kawan-route', async ({ ack, respond }) => {
-  await ack();
-  const res = await runWeekly({ repo, messaging, parser, composer }, DEMO_TEAM_ID, DEMO_WEEK, cycle);
-  await respond(`Routing mingguan: ${res.delivered.length} pool terkirim.`);
-});
-
-app.command('/kawan-clinical', async ({ ack, body }) => {
-  await ack();
-  await messaging.openClinicalDoor(body.user_id);
-});
+const scheduler = new Scheduler(
+  { repo, messaging, parser, composer, screening },
+  { teamId: DEMO_TEAM_ID, cycle, week: DEMO_WEEK },
+  { screenTickMs: num('SCREEN_TICK_MS', HOUR), routeTickMs: num('ROUTE_TICK_MS', WEEK) },
+);
 
 void (async () => {
   for await (const event of messaging.receiveResponse()) {
@@ -69,4 +65,9 @@ void (async () => {
 })();
 
 await app.start();
-console.log('KAWAN Slack adapter jalan (Socket Mode). Slash: /kawan-screen /kawan-route /kawan-clinical');
+
+await scheduler.openClinicalDoors();
+await scheduler.screenTick();
+scheduler.start();
+
+console.log('KAWAN Slack adapter jalan (Socket Mode). Scheduler proaktif aktif — tak ada pemicu manual.');

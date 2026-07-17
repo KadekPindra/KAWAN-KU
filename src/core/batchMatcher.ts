@@ -27,7 +27,9 @@ function affinityScore(need: Need, p: Person, cfg: Config): number {
 }
 
 export function bestMatch(person: Person, needs: Need[], cfg: Config = config): Need | null {
-  const eligible = needs.filter((n) => n.teamId === person.teamId && n.status === 'open' && n.slotsOpen > 0);
+  const eligible = needs.filter(
+    (n) => n.teamId === person.teamId && n.status === 'open' && n.slotsOpen > 0 && n.authorPersonId !== person.id,
+  );
   if (!eligible.length) return null;
   const ranked = eligible
     .map((n) => ({ need: n, score: affinityScore(n, person, cfg) }))
@@ -48,7 +50,10 @@ export function batchMatch(input: MatchInput): MatchResult {
 
   for (const need of ordered) {
     const eligible = input.roster.filter(
-      (p) => p.teamId === need.teamId && (poolsPerPerson.get(p.id) ?? 0) < cfg.MAX_POOLS_PER_WEEK,
+      (p) =>
+        p.teamId === need.teamId &&
+        p.id !== need.authorPersonId &&
+        (poolsPerPerson.get(p.id) ?? 0) < cfg.MAX_POOLS_PER_WEEK,
     );
 
     const ranked = shuffle(eligible, rng)

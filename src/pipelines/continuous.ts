@@ -23,7 +23,10 @@ export async function handleInbound(deps: ContinuousDeps, e: InboundEvent): Prom
       return;
     }
     case 'need':
-      await deps.harvester.collect(deps.teamId, 'member', e.text, deps.week);
+      await deps.harvester.collect(deps.teamId, 'member', e.text, deps.week, {
+        authorPersonId: e.personId,
+        sourceUrl: e.sourceUrl,
+      });
       return;
     case 'claim':
       await deps.claim.claim(e.personId, e.needId);

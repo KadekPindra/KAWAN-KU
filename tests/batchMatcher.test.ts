@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { batchMatch } from '../src/core/batchMatcher';
+import { batchMatch, bestMatch } from '../src/core/batchMatcher';
 import { mulberry32 } from '../src/core/rng';
 import { config } from '../src/config/index';
 import type { Need, Person } from '../src/domain/types';
@@ -102,6 +102,33 @@ describe('BatchMatcher — supply-risk (C3)', () => {
     });
 
     expect(skippedFlagged).toHaveLength(0);
+  });
+});
+
+describe('BatchMatcher — penulis tak dapat kebutuhannya sendiri', () => {
+  it('batchMatch: penulis need dikecualikan dari pool need itu', () => {
+    const roster = people('p', 4);
+    const n = { ...need('n', 6), authorPersonId: 'p0' };
+
+    const { pools } = batchMatch({
+      needs: [n],
+      roster,
+      flagged: new Set(),
+      week: '2026-W01',
+      rng: mulberry32(1),
+    });
+
+    expect(pools).toHaveLength(1);
+    expect(pools[0].memberIds).not.toContain('p0');
+  });
+
+  it('bestMatch: need milik sendiri tak pernah jadi kandidat reverse-match', () => {
+    const person = people('p', 1)[0];
+    const own = { ...need('own', 1), authorPersonId: person.id };
+    const other = { ...need('other', 1) };
+
+    expect(bestMatch(person, [own])).toBeNull();
+    expect(bestMatch(person, [own, other])?.id).toBe('other');
   });
 });
 

@@ -146,10 +146,17 @@ function contextLine(need: Need): KnownBlock | null {
   return { type: 'context', elements: [{ type: 'mrkdwn', text: parts.join('  |  ') }] };
 }
 
+function sourceLine(need: Need): KnownBlock | null {
+  if (!need.sourceUrl) return null;
+  return { type: 'context', elements: [{ type: 'mrkdwn', text: `🔗 <${need.sourceUrl}|Lihat percakapan aslinya>` }] };
+}
+
 export function poolBlocks(need: Need, copy: InviteCopy, needId: string): KnownBlock[] {
   const blocks: KnownBlock[] = [{ type: 'section', text: { type: 'mrkdwn', text: copy.problem } }];
   const context = contextLine(need);
   if (context) blocks.push(context);
+  const source = sourceLine(need);
+  if (source) blocks.push(source);
   blocks.push(
     { type: 'section', text: { type: 'mrkdwn', text: copy.needFramed } },
     {

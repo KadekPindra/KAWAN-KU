@@ -72,6 +72,8 @@ export interface Need {
   week: Week;
   status: NeedStatus;
   createdAt: Date;
+  authorPersonId?: string;
+  sourceUrl?: string;
 }
 
 export interface Pool {

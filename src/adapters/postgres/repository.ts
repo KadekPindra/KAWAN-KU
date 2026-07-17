@@ -74,6 +74,8 @@ export function rowToNeed(r: Record<string, unknown>): Need {
     week: r.week as string,
     status: r.status as Need['status'],
     createdAt: r.created_at as Date,
+    authorPersonId: (r.author_person_id as string | null) ?? undefined,
+    sourceUrl: (r.source_url as string | null) ?? undefined,
   };
 }
 
@@ -214,12 +216,15 @@ export class PostgresRepository implements Repository {
   }
   async saveNeed(n: Need): Promise<void> {
     await this.pool.query(
-      `insert into needs (id, team_id, source, raw_text, parsed, slots_total, slots_open, week, status, created_at)
-       values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10)
+      `insert into needs (id, team_id, source, raw_text, parsed, slots_total, slots_open, week, status, created_at, author_person_id, source_url)
+       values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12)
        on conflict (id) do update set
          source=excluded.source, raw_text=excluded.raw_text, parsed=excluded.parsed,
          slots_total=excluded.slots_total, slots_open=excluded.slots_open, status=excluded.status`,
-      [n.id, n.teamId, n.source, n.rawText, j(n.parsed), n.slotsTotal, n.slotsOpen, n.week, n.status, n.createdAt],
+      [
+        n.id, n.teamId, n.source, n.rawText, j(n.parsed), n.slotsTotal, n.slotsOpen, n.week, n.status, n.createdAt,
+        n.authorPersonId ?? null, n.sourceUrl ?? null,
+      ],
     );
   }
   // Atomik §5.3 — pemenang tunggal walau banyak klaim serempak.

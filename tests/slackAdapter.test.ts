@@ -107,6 +107,23 @@ describe('block builders', () => {
     expect(blocks).toContain('need-x');
   });
 
+  it('poolBlocks menyertakan link sumber kalau need.sourceUrl ada', () => {
+    const need = { parsed: null, sourceUrl: 'https://slack.com/archives/C1/p1' } as Need;
+    const blocks = JSON.stringify(
+      poolBlocks(need, { problem: 'p', needFramed: 'n', claimLabel: 'Isi' }, 'need-x'),
+    );
+    expect(blocks).toContain('https://slack.com/archives/C1/p1');
+    expect(blocks).toContain('Lihat percakapan aslinya');
+  });
+
+  it('poolBlocks tak menyertakan baris link kalau sourceUrl kosong', () => {
+    const need = { parsed: null } as Need;
+    const blocks = JSON.stringify(
+      poolBlocks(need, { problem: 'p', needFramed: 'n', claimLabel: 'Isi' }, 'need-x'),
+    );
+    expect(blocks).not.toContain('Lihat percakapan aslinya');
+  });
+
   it('markQuestionAnswered mengganti baris tombol pertanyaan itu jadi teks terkunci', () => {
     const blocks = questionBlocks('2026-06', 1);
     const locked = markQuestionAnswered(blocks, 1, 3);

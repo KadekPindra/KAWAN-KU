@@ -20,7 +20,7 @@ export class NeedHarvester {
     source: NeedSource,
     rawText: string,
     week: string,
-    now: Date = new Date(),
+    opts: { now?: Date; authorPersonId?: string; sourceUrl?: string } = {},
   ): Promise<Need> {
     const need: Need = {
       id: `need:${randomUUID()}`,
@@ -32,7 +32,9 @@ export class NeedHarvester {
       slotsOpen: 1,
       week,
       status: 'open',
-      createdAt: now,
+      createdAt: opts.now ?? new Date(),
+      authorPersonId: opts.authorPersonId,
+      sourceUrl: opts.sourceUrl,
     };
     await this.repo.saveNeed(need);
     return need;

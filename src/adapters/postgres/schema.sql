@@ -47,7 +47,9 @@ create table if not exists needs (
   slots_open int not null,
   week text not null,
   status text not null,
-  created_at timestamptz not null
+  created_at timestamptz not null,
+  author_person_id text,
+  source_url text
 );
 
 create table if not exists pools (

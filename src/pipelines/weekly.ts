@@ -55,7 +55,10 @@ export async function runWeekly(
     const need = needs.find((n) => n.id === pool.needId);
     if (!need) continue;
 
+    const freshMemberIds: string[] = [];
     for (const personId of pool.memberIds) {
+      // Lewati yang sudah pernah ditawari need ini (mis. lewat reversed matchmaking di survey) — no re-nudge.
+      if (await deps.repo.findInvite(personId, need.id)) continue;
       const invite: Invite = {
         id: `invite:${pool.id}:${personId}`,
         poolId: pool.id,
@@ -66,11 +69,14 @@ export async function runWeekly(
         claimedAt: null,
       };
       await deps.repo.saveInvite(invite);
+      freshMemberIds.push(personId);
     }
 
-    const copy = await deps.composer.compose(need);
-    await deps.messaging.deliverPool(need, pool.memberIds, copy);
-    delivered.push({ pool, need, copy });
+    if (freshMemberIds.length > 0) {
+      const copy = await deps.composer.compose(need);
+      await deps.messaging.deliverPool(need, freshMemberIds, copy);
+      delivered.push({ pool, need, copy });
+    }
   }
 
   return { delivered, skippedFlagged };

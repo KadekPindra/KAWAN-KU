@@ -4,7 +4,7 @@ export type Week = string;
 export type Trend = 'new' | 'improving' | 'flat' | 'worsening';
 export type NeedSource = 'member' | 'community';
 export type NeedStatus = 'open' | 'filled' | 'expired';
-export type InviteState = 'shown' | 'claimed' | 'ignored' | 'closed';
+export type InviteState = 'shown' | 'claimed' | 'declined' | 'ignored' | 'closed';
 export type RiskSource = 'risk_item' | 'self_referral';
 export type Effort = 'low' | 'medium' | 'high';
 export type Anchor = 1 | 2 | 3;
@@ -51,10 +51,12 @@ export interface ParsedNeed {
   skill: string;
   slots: number;
   when: string;
+  location: string;
   effort: Effort;
 }
 
 export interface InviteCopy {
+  problem: string;
   needFramed: string;
   claimLabel: string;
 }

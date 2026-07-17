@@ -54,6 +54,7 @@ const NEED_SYSTEM = [
   'skill: "casual" atau "competitive".',
   'slots: jumlah orang yang dibutuhkan, bilangan bulat >= 1.',
   'when: waktu apa adanya dari teks (boleh kosong).',
+  'location: nama tempat singkat kalau disebutkan di teks (boleh kosong).',
   'effort: "low" | "medium" | "high".',
   'Jangan mengarang; kalau tak jelas pakai default wajar.',
 ].join(' ');
@@ -65,9 +66,10 @@ const NEED_SCHEMA: Record<string, unknown> = {
     skill: { type: 'STRING' },
     slots: { type: 'INTEGER' },
     when: { type: 'STRING' },
+    location: { type: 'STRING' },
     effort: { type: 'STRING', enum: ['low', 'medium', 'high'] },
   },
-  required: ['activity', 'skill', 'slots', 'when', 'effort'],
+  required: ['activity', 'skill', 'slots', 'when', 'location', 'effort'],
 };
 
 function coerceParsedNeed(raw: unknown): ParsedNeed | null {
@@ -80,7 +82,8 @@ function coerceParsedNeed(raw: unknown): ParsedNeed | null {
   const effort: Effort = o.effort === 'low' || o.effort === 'high' ? o.effort : 'medium';
   const skill = typeof o.skill === 'string' && o.skill.trim() ? o.skill.trim().toLowerCase() : 'casual';
   const when = typeof o.when === 'string' ? o.when.trim() : '';
-  return { activity, skill, slots, when, effort };
+  const location = typeof o.location === 'string' ? o.location.trim() : '';
+  return { activity, skill, slots, when, location, effort };
 }
 
 export class GeminiNeedParser implements NeedParser {
@@ -104,20 +107,22 @@ export class GeminiNeedParser implements NeedParser {
 }
 
 const INVITE_SYSTEM = [
-  'Kamu menulis SATU kalimat untuk mengisi slot kegiatan tim, dalam Bahasa Indonesia.',
-  'WAJIB berupa PERNYATAAN KEBUTUHAN: tim kekurangan orang untuk sebuah peran.',
-  'DILARANG KERAS framing ajakan atau simpati: tanpa "yuk", "ayo", "ikutan", "gabung yuk", "biar nggak sendirian", tanpa iba.',
+  'Kamu menulis DUA kalimat untuk mengisi slot kegiatan tim, dalam Bahasa Indonesia.',
+  'problem: kalimat pembuka yang menyampaikan fakta ada kebutuhan baru (mis. "Ada yang baru butuh tambahan orang buat futsal sore ini.").',
+  'needFramed: PERNYATAAN KEBUTUHAN inti: tim kekurangan orang untuk sebuah peran.',
+  'KEDUA kalimat WAJIB framing KEBUTUHAN. DILARANG KERAS framing ajakan atau simpati: tanpa "yuk", "ayo", "ikutan", "gabung yuk", "biar nggak sendirian", tanpa iba.',
   'Jangan sebut kesepian, skrining, atau kondisi personal siapa pun.',
-  'Keluarkan JSON: needFramed (kalimat kebutuhan) dan claimLabel (teks tombol singkat untuk mengambil slot).',
+  'Keluarkan JSON: problem, needFramed, dan claimLabel (teks tombol singkat untuk mengambil slot).',
 ].join(' ');
 
 const INVITE_SCHEMA: Record<string, unknown> = {
   type: 'OBJECT',
   properties: {
+    problem: { type: 'STRING' },
     needFramed: { type: 'STRING' },
     claimLabel: { type: 'STRING' },
   },
-  required: ['needFramed', 'claimLabel'],
+  required: ['problem', 'needFramed', 'claimLabel'],
 };
 
 const INVITATION_MARKERS = /\b(yuk|ayo|ikutan|gabung|join|mari|kuy)\b/i;
@@ -130,16 +135,17 @@ export function passesNeedContract(text: string): boolean {
 function coerceInviteCopy(raw: unknown): InviteCopy | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const o = raw as Record<string, unknown>;
+  const problem = typeof o.problem === 'string' ? o.problem.trim() : '';
   const needFramed = typeof o.needFramed === 'string' ? o.needFramed.trim() : '';
   const claimLabel = typeof o.claimLabel === 'string' && o.claimLabel.trim() ? o.claimLabel.trim() : 'Saya isi slotnya';
-  if (!needFramed) return null;
-  return { needFramed, claimLabel };
+  if (!problem || !needFramed) return null;
+  return { problem, needFramed, claimLabel };
 }
 
 function describeNeed(need: Need): string {
   const p = need.parsed;
   if (!p) return need.rawText;
-  return `activity=${p.activity}; slots=${need.slotsOpen || p.slots}; when=${p.when || '-'}; skill=${p.skill}; effort=${p.effort}`;
+  return `activity=${p.activity}; slots=${need.slotsOpen || p.slots}; when=${p.when || '-'}; location=${p.location || '-'}; skill=${p.skill}; effort=${p.effort}`;
 }
 
 export class GeminiInviteComposer implements InviteComposer {
@@ -157,7 +163,7 @@ export class GeminiInviteComposer implements InviteComposer {
           responseSchema: INVITE_SCHEMA,
         });
         const copy = coerceInviteCopy(JSON.parse(out));
-        if (copy && passesNeedContract(copy.needFramed)) return copy;
+        if (copy && passesNeedContract(copy.problem) && passesNeedContract(copy.needFramed)) return copy;
       } catch {
         // jatuh ke template
       }

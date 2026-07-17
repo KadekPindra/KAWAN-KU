@@ -12,6 +12,8 @@ const ACTIVITIES = [
 const DAYS = /\b(senin|selasa|rabu|kamis|jumat|sabtu|minggu)\b/;
 const TIME_OF_DAY = /\b(pagi|siang|sore|malam)\b/;
 const CLOCK = /jam\s*\d+/;
+// Best-effort: "di/at <Nama Tempat>" sampai tanda baca/penghubung waktu berikutnya. Bisa kosong kalau tak disebut.
+const LOCATION = /\b(?:di|at)\s+([a-z][a-z0-9\s]{2,30}?)(?=\s*(?:jam|sore|pagi|siang|malam|,|\.|$))/i;
 
 export function parseNeedTemplate(rawText: string): ParsedNeed {
   const t = rawText.toLowerCase();
@@ -32,7 +34,7 @@ export function parseNeedTemplate(rawText: string): ParsedNeed {
   const effort: Effort = serious ? 'high' : casual ? 'low' : 'medium';
   const skill = serious ? 'competitive' : 'casual';
 
-  return { activity, skill, slots, when: extractWhen(t), effort };
+  return { activity, skill, slots, when: extractWhen(t), location: extractLocation(t), effort };
 }
 
 function extractWhen(t: string): string {
@@ -40,6 +42,10 @@ function extractWhen(t: string): string {
   if (t.includes('sore ini')) return 'sore ini';
   const parts = [DAYS.exec(t)?.[0], CLOCK.exec(t)?.[0], TIME_OF_DAY.exec(t)?.[0]].filter(Boolean);
   return parts.join(' ').trim();
+}
+
+function extractLocation(t: string): string {
+  return LOCATION.exec(t)?.[1]?.trim() ?? '';
 }
 
 export class TemplateNeedParser implements NeedParser {

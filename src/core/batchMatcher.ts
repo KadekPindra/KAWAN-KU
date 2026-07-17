@@ -26,6 +26,18 @@ function affinityScore(need: Need, p: Person, cfg: Config): number {
   return cfg.affinityWeights.affinity * a;
 }
 
+// Reversed matchmaking: satu orang, pilih SATU need terbuka dengan affinity tertinggi di timnya.
+// Dipakai buat nawarin langsung begitu orang itu selesai jawab survey (§ ReverseMatchService),
+// terpisah dari batchMatch() mingguan yang mengurus dilusi/pool banyak-orang sekaligus.
+export function bestMatch(person: Person, needs: Need[], cfg: Config = config): Need | null {
+  const eligible = needs.filter((n) => n.teamId === person.teamId && n.status === 'open' && n.slotsOpen > 0);
+  if (!eligible.length) return null;
+  const ranked = eligible
+    .map((n) => ({ need: n, score: affinityScore(n, person, cfg) }))
+    .sort((a, b) => b.score - a.score);
+  return ranked[0].need;
+}
+
 export function batchMatch(input: MatchInput): MatchResult {
   const cfg = input.cfg ?? config;
   const rng = input.rng ?? mulberry32(1);

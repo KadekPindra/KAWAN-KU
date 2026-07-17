@@ -4,6 +4,7 @@ export type InboundEvent =
   | { kind: 'screenAnswer'; personId: string; cycle: Cycle; q: 1 | 2 | 3; value: Anchor }
   | { kind: 'need'; personId: string; text: string }
   | { kind: 'claim'; personId: string; needId: string }
+  | { kind: 'decline'; personId: string; needId: string }
   | { kind: 'riskItem'; personId: string; positive: boolean }
   | { kind: 'selfReferral'; personId: string };
 

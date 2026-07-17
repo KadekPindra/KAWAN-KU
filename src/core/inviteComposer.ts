@@ -13,6 +13,11 @@ function activityOf(need: Need): string {
   return DISPLAY[a] ?? a;
 }
 
+export function problemTemplate(need: Need): string {
+  const when = need.parsed?.when ? ` buat ${need.parsed.when}` : '';
+  return `Ada yang baru butuh tambahan orang buat ${activityOf(need)}${when}.`;
+}
+
 export function needFramedTemplate(need: Need): string {
   const slots = need.slotsOpen || need.parsed?.slots || 1;
   const when = need.parsed?.when ? ` buat ${need.parsed.when}` : '';
@@ -26,6 +31,6 @@ export function invitationTemplate(need: Need): string {
 
 export class TemplateInviteComposer implements InviteComposer {
   async compose(need: Need): Promise<InviteCopy> {
-    return { needFramed: needFramedTemplate(need), claimLabel: 'Saya isi slotnya' };
+    return { problem: problemTemplate(need), needFramed: needFramedTemplate(need), claimLabel: 'Saya isi slotnya' };
   }
 }

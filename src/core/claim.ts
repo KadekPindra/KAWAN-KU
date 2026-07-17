@@ -37,4 +37,12 @@ export class ClaimService {
     }
     return 'claimed';
   }
+
+  // Efek nyata (bukan sekadar diam): tapi tak overwrite invite yang sudah claimed/declined lebih dulu.
+  async decline(personId: string, needId: string): Promise<void> {
+    const invite = await this.repo.findInvite(personId, needId);
+    if (!invite || invite.state !== 'shown') return;
+    invite.state = 'declined';
+    await this.repo.saveInvite(invite);
+  }
 }

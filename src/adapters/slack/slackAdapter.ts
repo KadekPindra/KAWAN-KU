@@ -7,9 +7,9 @@ import { config } from '../../config/index';
 import type { SlackDirectory } from './directory';
 
 export const UCLA3_ITEMS: Record<1 | 2 | 3, string> = {
-  1: 'Time for a quick screen break! Just out of curiosity, how often do you feel that you lack companionship outside of work lately?',
-  2: 'And how often do you feel left out or excluded by the people around you?',
-  3: "Last one — how often do you feel distant from the people around you these days?",
+  1: 'How often do you feel that you lack companionship?',
+  2: 'How often do you feel left out?',
+  3: 'How often do you feel isolated from others?',
 };
 
 export const UCLA3_ANCHORS: Record<Anchor, string> = { 1: 'Rarely', 2: 'Sometimes', 3: 'Often' };
@@ -310,15 +310,15 @@ export class SlackAdapter implements MessagingPort {
     for (const q of [1, 2, 3] as const) {
       await this.app.client.chat.postMessage({
         channel: r.slackUserId,
-        text: UCLA3_ITEMS[q],
-        attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: questionBlocks(cycle, q, q === 1) }],
+        attachments: [
+          { color: SCREEN_ACCENT_COLOR, fallback: UCLA3_ITEMS[q], blocks: questionBlocks(cycle, q, q === 1) },
+        ],
       });
     }
     if (r.riskConsent) {
       await this.app.client.chat.postMessage({
         channel: r.slackUserId,
-        text: RISK_ITEM,
-        attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: riskItemBlocks() }],
+        attachments: [{ color: SCREEN_ACCENT_COLOR, fallback: RISK_ITEM, blocks: riskItemBlocks() }],
       });
     }
   }

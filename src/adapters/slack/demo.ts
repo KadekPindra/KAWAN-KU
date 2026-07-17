@@ -1,5 +1,5 @@
 import { App } from '@slack/bolt';
-import type { Need, Person } from '../../domain/types';
+import type { Person } from '../../domain/types';
 import { config } from '../../config/index';
 import { createRepository } from '../repositoryFactory';
 import { createGeminiClient, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
@@ -11,7 +11,7 @@ import { ReverseMatchService } from '../../core/reverseMatch';
 import { handleInbound } from '../../pipelines/continuous';
 import { runWeekly } from '../../pipelines/weekly';
 import { cycleOf } from '../../pipelines/scheduler';
-import { DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
+import { DEMO_TEAM_ID, DEMO_WEEK } from '../../seed/demoTeam';
 import { RepoSlackDirectory } from './directory';
 import {
   SlackAdapter,
@@ -28,24 +28,6 @@ if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
 }
 
 const repo = await createRepository();
-if (process.env.KAWAN_REPO?.trim().toLowerCase() !== 'postgres') {
-  await seedDemoTeam(repo);
-  await seedDemoNeeds(repo);
-}
-
-const demoNeed: Need = {
-  id: 'demo-futsal',
-  teamId: DEMO_TEAM_ID,
-  source: 'member',
-  rawText: 'butuh 1 lagi buat futsal sore ini, yang penting bisa lari',
-  parsed: { activity: 'futsal', skill: 'casual', slots: 1, when: 'sore ini', location: 'GOR Kampus', effort: 'low' },
-  slotsTotal: 1,
-  slotsOpen: 1,
-  week: DEMO_WEEK,
-  status: 'open',
-  createdAt: new Date(),
-};
-await repo.saveNeed(demoNeed);
 
 const app = new App({
   token: SLACK_BOT_TOKEN,
@@ -137,14 +119,10 @@ app.command('/butuh', async ({ ack, body, client }) => {
 void (async () => {
   for await (const event of messaging.receiveResponse()) {
     await handleInbound({ teamId: DEMO_TEAM_ID, week: DEMO_WEEK, screening, harvester, claim, clinical, reverseMatch }, event);
-    if (event.kind === 'screenAnswer' && event.q === 1) {
-      const copy = await composer.compose(demoNeed);
-      await messaging.deliverPool(demoNeed, [event.personId], copy);
-    }
   }
 })();
 
 await app.start();
 console.log(
-  'KAWAN DEMO jalan (Socket Mode). /kawanku: sambutan → 1 pertanyaan → tawaran aktivitas. /butuh <teks>: ajukan kebutuhan sendiri.',
+  'KAWAN DEMO jalan (Socket Mode). /kawanku: sambutan → 1 pertanyaan. /butuh <teks>: ajukan kebutuhan nyata → LLM parse+compose → ditawarkan ke roster lain yang match.',
 );

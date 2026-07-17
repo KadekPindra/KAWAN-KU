@@ -9,7 +9,7 @@ import { ClinicalRouter } from '../../core/clinicalRouter';
 import { ReverseMatchService } from '../../core/reverseMatch';
 import { handleInbound } from '../../pipelines/continuous';
 import { Scheduler } from '../../pipelines/scheduler';
-import { DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
+import { DEMO_TEAM_ID, DEMO_WEEK } from '../../seed/demoTeam';
 import { RepoSlackDirectory } from './directory';
 import { SlackAdapter, resolveDisplayName } from './slackAdapter';
 
@@ -29,10 +29,6 @@ const HOUR = 60 * 60 * 1000;
 const WEEK = 7 * 24 * HOUR;
 
 const repo = await createRepository();
-if (process.env.KAWAN_REPO?.trim().toLowerCase() !== 'postgres') {
-  await seedDemoTeam(repo);
-  await seedDemoNeeds(repo);
-}
 
 const app = new App({
   token: SLACK_BOT_TOKEN,

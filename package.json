@@ -1,17 +1,41 @@
 {
   "name": "kawan-ku",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "KAWAN — automated link worker: monthly UCLA-3 loneliness screening + need-framed community routing bot (Garuda Hacks 7.0, Health track)",
+  "type": "module",
+  "main": "src/index.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "demo": "tsx src/demo/runSpine.ts",
+    "slack": "tsx src/adapters/slack/run.ts",
+    "slack:demo": "tsx src/adapters/slack/demo.ts",
+    "seed": "tsx src/seed/seed.ts",
+    "db:seed": "tsx src/adapters/postgres/seed.ts",
+    "metrics": "tsx src/views/run.ts",
+    "dev": "tsx watch src/demo/runSpine.ts"
   },
-  "keywords": [],
+  "keywords": [
+    "loneliness",
+    "social-prescribing",
+    "slack-bot",
+    "ucla-3",
+    "mental-health"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
+    "@google/genai": "^2.12.0",
     "@slack/bolt": "^5.0.0",
-    "dotenv": "^17.4.2"
+    "dotenv": "^17.4.2",
+    "pg": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.20.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
   }
 }

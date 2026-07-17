@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: kawan
+      POSTGRES_PASSWORD: kawan
+      POSTGRES_DB: kawan
+    volumes:
+      - kawan-pgdata:/var/lib/postgresql/data
+      - ./src/adapters/postgres/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kawan -d kawan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    env_file: .env
+    environment:
+      KAWAN_REPO: postgres
+      DATABASE_URL: postgresql://kawan:kawan@db:5432/kawan
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  kawan-pgdata:

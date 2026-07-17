@@ -44,8 +44,6 @@ export function rowToScreening(r: Record<string, unknown>): Screening {
     ucla3Score: (r.ucla3_score as number | null) ?? null,
     lonely: (r.lonely as boolean | null) ?? null,
     deliveredAt: (r.delivered_at as Date | null) ?? null,
-    lastSentAt: (r.last_sent_at as Date | null) ?? null,
-    lastAnsweredAt: (r.last_answered_at as Date | null) ?? null,
     answeredAt: (r.answered_at as Date | null) ?? null,
     createdAt: r.created_at as Date,
   };
@@ -172,16 +170,12 @@ export class PostgresRepository implements Repository {
   }
   async saveScreening(s: Screening): Promise<void> {
     await this.pool.query(
-      `insert into screenings (id, team_id, person_id, cycle, q1, q2, q3, ucla3_score, lonely, delivered_at, last_sent_at, last_answered_at, answered_at, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+      `insert into screenings (id, team_id, person_id, cycle, q1, q2, q3, ucla3_score, lonely, delivered_at, answered_at, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        on conflict (id) do update set
          q1=excluded.q1, q2=excluded.q2, q3=excluded.q3, ucla3_score=excluded.ucla3_score, lonely=excluded.lonely,
-         delivered_at=excluded.delivered_at, last_sent_at=excluded.last_sent_at, last_answered_at=excluded.last_answered_at,
-         answered_at=excluded.answered_at`,
-      [
-        s.id, s.teamId, s.personId, s.cycle, s.q1, s.q2, s.q3, s.ucla3Score, s.lonely,
-        s.deliveredAt, s.lastSentAt, s.lastAnsweredAt, s.answeredAt, s.createdAt,
-      ],
+         delivered_at=excluded.delivered_at, answered_at=excluded.answered_at`,
+      [s.id, s.teamId, s.personId, s.cycle, s.q1, s.q2, s.q3, s.ucla3Score, s.lonely, s.deliveredAt, s.answeredAt, s.createdAt],
     );
   }
 

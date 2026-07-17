@@ -23,29 +23,31 @@ async function build() {
 }
 
 describe('Scheduler (pemicu proaktif, tanpa command manual)', () => {
-  it('screenTick mengirim 1 pertanyaan (q1) ke orang yang jatuh tempo — per orang, bukan broadcast', async () => {
+  it('screenTick mengirim skrining ke orang yang jatuh tempo — per orang, bukan broadcast', async () => {
     const { repo, messaging, scheduler } = await build();
-    await scheduler.screenTick(new Date('2027-01-01')); // jauh di masa depan → semua yang punya histori lengkap jatuh tempo
+    await scheduler.screenTick(new Date('2027-01-01')); // bulan belum ter-seed & jauh → semua jatuh tempo
     const roster = await repo.listPeople(DEMO_TEAM_ID);
-    // putu & kadek: siklus terakhir mereka di seed data adalah non-response (nggak pernah kejawab) —
-    // itu berarti masih "nunggu jawaban pertanyaan sebelumnya", bukan jatuh tempo buat siklus baru.
-    const stillWaiting = 2;
-    expect(messaging.postedQuestions.length).toBe(roster.length - stillWaiting);
-    expect(messaging.postedQuestions.every((p) => p.cycle === '2027-01' && p.q === 1)).toBe(true);
+    expect(messaging.postedScreenings.length).toBe(roster.length);
+    expect(messaging.postedScreenings.every((p) => p.cycle === '2027-01')).toBe(true);
   });
 
-  it('screenTick belum jatuh tempo => nggak ada yang dikirim, walau cycle string kebetulan sama dengan yang sudah ter-seed', async () => {
+  it('screenTick idempoten: bulan yang sudah ter-seed tak dikirim ulang', async () => {
     const { messaging, scheduler } = await build();
-    // 2 hari setelah pengiriman terakhir (2026-06-01) — jauh di bawah interval adaptif tercepat (14-5=9 hari),
-    // jadi semua orang dengan histori lengkap belum due; putu/kadek tetap nunggu jawaban lama.
-    await scheduler.screenTick(new Date('2026-06-03'));
-    expect(messaging.postedQuestions.length).toBe(0);
+    await scheduler.screenTick(new Date('2026-06-15')); // cycle 2026-06 sudah ter-seed
+    expect(messaging.postedScreenings.length).toBe(0);
   });
 
   it('routeTick mengirim pool need-framed', async () => {
     const { messaging, scheduler } = await build();
     await scheduler.routeTick();
     expect(messaging.deliveredPools.length).toBeGreaterThan(0);
+  });
+
+  it('openClinicalDoors membuka pintu untuk seluruh roster (always-on)', async () => {
+    const { repo, messaging, scheduler } = await build();
+    await scheduler.openClinicalDoors();
+    const roster = await repo.listPeople(DEMO_TEAM_ID);
+    expect(messaging.clinicalDoors.length).toBe(roster.length);
   });
 
   it('start/stop tidak meninggalkan timer menggantung', async () => {

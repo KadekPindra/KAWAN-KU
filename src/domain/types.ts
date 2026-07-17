@@ -31,8 +31,6 @@ export interface Screening {
   ucla3Score: number | null;
   lonely: boolean | null;
   deliveredAt: Date | null;
-  lastSentAt: Date | null;
-  lastAnsweredAt: Date | null;
   answeredAt: Date | null;
   createdAt: Date;
 }

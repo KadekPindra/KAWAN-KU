@@ -1,13 +1,7 @@
 import { App } from '@slack/bolt';
 import type { Person } from '../../domain/types';
 import { createRepository } from '../repositoryFactory';
-import {
-  createGeminiClient,
-  GeminiClaimAcknowledger,
-  GeminiInviteComposer,
-  GeminiNeedParser,
-  GeminiScreeningQuestionComposer,
-} from '../llm/gemini';
+import { createGeminiClient, GeminiClaimAcknowledger, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
 import { ScreeningService } from '../../core/screening';
 import { NeedHarvester, looksLikeNeed } from '../../core/needHarvester';
 import { ClaimService, OutcomeLog } from '../../core/claim';
@@ -143,8 +137,7 @@ const gemini = createGeminiClient();
 const parser = new GeminiNeedParser(gemini);
 const composer = new GeminiInviteComposer(gemini);
 const acknowledger = new GeminiClaimAcknowledger(gemini);
-const screeningQuestionComposer = new GeminiScreeningQuestionComposer(gemini);
-const screening = new ScreeningService(repo, messaging, screeningQuestionComposer);
+const screening = new ScreeningService(repo, messaging);
 const harvester = new NeedHarvester(repo);
 const claim = new ClaimService(repo, new OutcomeLog(repo), messaging, acknowledger);
 const clinical = new ClinicalRouter(repo, messaging);
@@ -192,6 +185,7 @@ async function bootstrapRoster(): Promise<void> {
 
 await bootstrapRoster();
 
+await scheduler.openClinicalDoors();
 await scheduler.screenTick();
 scheduler.start();
 

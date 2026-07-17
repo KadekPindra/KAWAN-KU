@@ -4,11 +4,6 @@ import type { ClaimOutcome } from '../../ports/messaging';
 import { NeedParser, TemplateNeedParser } from '../../core/needParser';
 import { InviteComposer, InviteCopy, TemplateInviteComposer } from '../../core/inviteComposer';
 import { ClaimAcknowledger, TemplateClaimAcknowledger } from '../../core/claimAcknowledger';
-import {
-  QuestionContext,
-  ScreeningQuestionComposer,
-  TemplateScreeningQuestionComposer,
-} from '../../core/screeningQuestion';
 
 const MODEL = 'gemini-2.5-flash';
 
@@ -193,54 +188,6 @@ const ACK_SCHEMA: Record<string, unknown> = {
   properties: { text: { type: 'STRING' } },
   required: ['text'],
 };
-
-const SCREEN_Q_CONCEPT: Record<1 | 2 | 3, string> = {
-  1: 'merasa kurang punya teman dekat (lack of companionship)',
-  2: 'merasa dikucilkan/tersisih dari lingkungan sekitar (left out)',
-  3: 'merasa jauh/terisolasi dari orang-orang sekitar (isolated from others)',
-};
-
-const SCREEN_Q_SYSTEM = [
-  'Kamu menulis SATU kalimat gaya "vibe check" santai dalam Bahasa Indonesia, buat menanyakan satu konsep spesifik dari skala loneliness UCLA-3.',
-  'JANGAN mengubah makna/konsep yang diukur — cuma variasikan kata-katanya biar tidak terasa formal atau berulang kayak form baku.',
-  'Kalau ini pertanyaan pertama dalam rangkaian (urutan=1), boleh dibuka sapaan singkat. Kalau bukan, langsung ke pertanyaannya, jangan ulangi sapaan.',
-  'DILARANG KERAS menyebut kata "survei", "skrining", "kesepian", "loneliness", "UCLA", atau istilah klinis lain — ini harus kerasa seperti obrolan santai biasa, bukan instrumen pengukuran.',
-  'Keluarkan JSON: { "text": "..." }',
-].join(' ');
-
-const SCREEN_Q_SCHEMA: Record<string, unknown> = {
-  type: 'OBJECT',
-  properties: { text: { type: 'STRING' } },
-  required: ['text'],
-};
-
-const CLINICAL_MARKERS = /(survei|skrining|screening|kesepian|loneliness|\bucla\b)/i;
-
-export function passesScreeningContract(text: string): boolean {
-  return text.trim().length > 0 && !CLINICAL_MARKERS.test(text);
-}
-
-export class GeminiScreeningQuestionComposer implements ScreeningQuestionComposer {
-  constructor(
-    private readonly client: GeminiClient | null,
-    private readonly fallback: ScreeningQuestionComposer = new TemplateScreeningQuestionComposer(),
-  ) {}
-
-  async compose(q: 1 | 2 | 3, ctx: QuestionContext): Promise<string> {
-    if (this.client) {
-      try {
-        const prompt = `konsep=${SCREEN_Q_CONCEPT[q]}; urutan=${q} dari 3; lonelyStreak=${ctx.lonelyStreak}; trend=${ctx.trend}`;
-        const out = await this.client.generate({ system: SCREEN_Q_SYSTEM, prompt, responseSchema: SCREEN_Q_SCHEMA });
-        const parsed = JSON.parse(out) as { text?: unknown };
-        const text = typeof parsed.text === 'string' ? parsed.text.trim() : '';
-        if (text && passesScreeningContract(text)) return text;
-      } catch {
-        // jatuh ke template
-      }
-    }
-    return this.fallback.compose(q, ctx);
-  }
-}
 
 export class GeminiClaimAcknowledger implements ClaimAcknowledger {
   constructor(

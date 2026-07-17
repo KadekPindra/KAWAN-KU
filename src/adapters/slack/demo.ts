@@ -3,13 +3,7 @@ import type { KnownBlock } from '@slack/types';
 import type { Person } from '../../domain/types';
 import { config } from '../../config/index';
 import { createRepository } from '../repositoryFactory';
-import {
-  createGeminiClient,
-  GeminiClaimAcknowledger,
-  GeminiInviteComposer,
-  GeminiNeedParser,
-  GeminiScreeningQuestionComposer,
-} from '../llm/gemini';
+import { createGeminiClient, GeminiClaimAcknowledger, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
 import { ScreeningService } from '../../core/screening';
 import { NeedHarvester, looksLikeNeed } from '../../core/needHarvester';
 import { ClaimService, OutcomeLog } from '../../core/claim';
@@ -136,8 +130,7 @@ const gemini = createGeminiClient();
 const parser = new GeminiNeedParser(gemini);
 const composer = new GeminiInviteComposer(gemini);
 const acknowledger = new GeminiClaimAcknowledger(gemini);
-const screeningQuestionComposer = new GeminiScreeningQuestionComposer(gemini);
-const screening = new ScreeningService(repo, messaging, screeningQuestionComposer);
+const screening = new ScreeningService(repo, messaging);
 const harvester = new NeedHarvester(repo);
 const claim = new ClaimService(repo, new OutcomeLog(repo), messaging, acknowledger);
 const clinical = new ClinicalRouter(repo, messaging);
@@ -170,11 +163,10 @@ app.command('/kawanku', async ({ ack, body, client }) => {
     blocks: welcomeBlocks(displayName, config.INSTITUTION_NAME),
   });
 
-  const questionText = await screeningQuestionComposer.compose(1, { lonelyStreak: 0, trend: 'new' });
   await client.chat.postMessage({
     channel,
     text: 'Weekly Vibe Check',
-    attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: questionBlocks(cycle, 1, questionText, true) }],
+    attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: questionBlocks(cycle, 1, true) }],
   });
 });
 

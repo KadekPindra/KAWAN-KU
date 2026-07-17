@@ -83,8 +83,6 @@ export async function seedDemoTeam(repo: Repository): Promise<void> {
         ucla3Score: score,
         lonely: score !== null ? isLonely(score) : null,
         deliveredAt: delivered,
-        lastSentAt: delivered,
-        lastAnsweredAt: score !== null ? answered : null,
         answeredAt: score !== null ? answered : null,
         createdAt: delivered,
       };

@@ -6,13 +6,11 @@ describe('InMemoryMessaging', () => {
   it('mencatat outbound: sambutan, screening, pool, pintu klinis', async () => {
     const m = new InMemoryMessaging();
     await m.sendWelcome('p1');
-    await m.postScreeningQuestion('p1', '2026-01', 1, 'gimana kabarnya belakangan ini?');
-    await m.postRiskItem('p1');
+    await m.postScreening('p1', '2026-01');
     await m.openClinicalDoor('u1');
 
     expect(m.welcomes).toEqual(['p1']);
-    expect(m.postedQuestions).toEqual([{ personId: 'p1', cycle: '2026-01', q: 1, text: 'gimana kabarnya belakangan ini?' }]);
-    expect(m.riskItems).toEqual(['p1']);
+    expect(m.postedScreenings).toEqual([{ personId: 'p1', cycle: '2026-01' }]);
     expect(m.clinicalDoors).toEqual(['u1']);
   });
 

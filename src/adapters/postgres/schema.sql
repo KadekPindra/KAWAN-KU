@@ -20,15 +20,10 @@ create table if not exists screenings (
   ucla3_score int,
   lonely boolean,
   delivered_at timestamptz,
-  last_sent_at timestamptz,
-  last_answered_at timestamptz,
   answered_at timestamptz,
   created_at timestamptz not null,
   unique (team_id, person_id, cycle)
 );
-
-alter table screenings add column if not exists last_sent_at timestamptz;
-alter table screenings add column if not exists last_answered_at timestamptz;
 
 create table if not exists detection_state (
   team_id text not null,

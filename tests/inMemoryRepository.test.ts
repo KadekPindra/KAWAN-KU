@@ -27,8 +27,6 @@ function screening(personId: string, cycle: string, teamId = 'T'): Screening {
     ucla3Score: null,
     lonely: null,
     deliveredAt: null,
-    lastSentAt: null,
-    lastAnsweredAt: null,
     answeredAt: null,
     createdAt: new Date('2026-01-01'),
   };

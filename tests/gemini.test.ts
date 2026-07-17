@@ -3,15 +3,12 @@ import {
   GeminiNeedParser,
   GeminiInviteComposer,
   GeminiClaimAcknowledger,
-  GeminiScreeningQuestionComposer,
   passesNeedContract,
-  passesScreeningContract,
   type GeminiClient,
 } from '../src/adapters/llm/gemini';
 import { parseNeedTemplate } from '../src/core/needParser';
 import { needFramedTemplate } from '../src/core/inviteComposer';
 import { TemplateClaimAcknowledger } from '../src/core/claimAcknowledger';
-import { UCLA3_CANONICAL } from '../src/core/screeningQuestion';
 import type { Need } from '../src/domain/types';
 
 function need(): Need {
@@ -128,46 +125,6 @@ describe('GeminiClaimAcknowledger', () => {
   it('client error => fallback template', async () => {
     const text = await new GeminiClaimAcknowledger(throwingClient()).acknowledge(need(), 'full');
     expect(text).toBe(await new TemplateClaimAcknowledger().acknowledge(need(), 'full'));
-  });
-});
-
-describe('GeminiScreeningQuestionComposer', () => {
-  const ctx = { lonelyStreak: 0, trend: 'new' as const };
-
-  it('tanpa client => identik dengan template (3 konsep UCLA-3 asli, apa adanya)', async () => {
-    const text = await new GeminiScreeningQuestionComposer(null).compose(2, ctx);
-    expect(text).toBe(UCLA3_CANONICAL[2]);
-  });
-
-  it('JSON valid & lolos kontrak => teks dari LLM dipakai apa adanya', async () => {
-    const client = fakeClient(JSON.stringify({ text: 'Belakangan ini gimana rasanya kumpul bareng temen-temen?' }));
-    const text = await new GeminiScreeningQuestionComposer(client).compose(1, ctx);
-    expect(text).toBe('Belakangan ini gimana rasanya kumpul bareng temen-temen?');
-  });
-
-  it('output menyebut kata klinis ("kesepian") langgar kontrak => fallback template', async () => {
-    const client = fakeClient(JSON.stringify({ text: 'Apa kamu lagi merasa kesepian belakangan ini?' }));
-    const text = await new GeminiScreeningQuestionComposer(client).compose(3, ctx);
-    expect(text).toBe(UCLA3_CANONICAL[3]);
-  });
-
-  it('JSON invalid => fallback template', async () => {
-    const text = await new GeminiScreeningQuestionComposer(fakeClient('bukan json')).compose(1, ctx);
-    expect(text).toBe(UCLA3_CANONICAL[1]);
-  });
-
-  it('client error => fallback template', async () => {
-    const text = await new GeminiScreeningQuestionComposer(throwingClient()).compose(2, ctx);
-    expect(text).toBe(UCLA3_CANONICAL[2]);
-  });
-});
-
-describe('passesScreeningContract', () => {
-  it('menolak kata klinis/eksplisit, menerima kalimat santai', () => {
-    expect(passesScreeningContract('Belakangan ini gimana kabarnya sama circle pertemanan?')).toBe(true);
-    expect(passesScreeningContract('Ini bagian dari survei kesepian mingguan kami.')).toBe(false);
-    expect(passesScreeningContract('Skrining UCLA menunjukkan kamu berisiko.')).toBe(false);
-    expect(passesScreeningContract('')).toBe(false);
   });
 });
 

@@ -3,9 +3,9 @@ import type { KnownBlock } from '@slack/types';
 import type { Person } from '../../domain/types';
 import { config } from '../../config/index';
 import { createRepository } from '../repositoryFactory';
-import { createGeminiClient, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
+import { createGeminiClient, GeminiClaimAcknowledger, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
 import { ScreeningService } from '../../core/screening';
-import { NeedHarvester } from '../../core/needHarvester';
+import { NeedHarvester, looksLikeNeed } from '../../core/needHarvester';
 import { ClaimService, OutcomeLog } from '../../core/claim';
 import { ClinicalRouter } from '../../core/clinicalRouter';
 import { ReverseMatchService } from '../../core/reverseMatch';
@@ -38,7 +38,6 @@ interface DemoPsychologist {
   detailUrl: string;
 }
 
-// Demo-only, hardcoded. Ganti URL foto & detail dengan data asli di sini.
 const PSYCHOLOGISTS: DemoPsychologist[] = [
   {
     name: "Dwi utari, Psikolog",
@@ -114,9 +113,10 @@ const messaging = new SlackAdapter(app, directory);
 const gemini = createGeminiClient();
 const parser = new GeminiNeedParser(gemini);
 const composer = new GeminiInviteComposer(gemini);
+const acknowledger = new GeminiClaimAcknowledger(gemini);
 const screening = new ScreeningService(repo, messaging);
 const harvester = new NeedHarvester(repo);
-const claim = new ClaimService(repo, new OutcomeLog(repo));
+const claim = new ClaimService(repo, new OutcomeLog(repo), messaging, acknowledger);
 const clinical = new ClinicalRouter(repo, messaging);
 const reverseMatch = new ReverseMatchService(repo, messaging, parser, composer);
 
@@ -154,26 +154,14 @@ app.command('/kawanku', async ({ ack, body, client }) => {
   });
 });
 
-app.command('/butuh', async ({ ack, body, client }) => {
-  await ack();
-  const text = body.text?.trim();
-  if (!text) {
-    // DM, bukan postEphemeral ke channel_id: /butuh bisa dipanggil dari channel mana pun yang
-    // bot belum tentu jadi anggotanya (postEphemeral ke channel asing -> not_in_channel).
-    await client.chat.postMessage({
-      channel: body.user_id,
-      text: 'Ketik kebutuhannya setelah /butuh, ya. Contoh: /butuh 1 lagi buat futsal sore ini di GOR Kampus.',
-    });
-    return;
-  }
-
-  if (!(await directory.personIdFor(body.user_id))) {
-    const displayName = await resolveDisplayName(client, body.user_id);
+async function submitNeed(client: App['client'], userId: string, text: string, echoChannelId?: string): Promise<void> {
+  if (!(await directory.personIdFor(userId))) {
+    const displayName = await resolveDisplayName(client, userId);
     const person: Person = {
-      id: body.user_id,
+      id: userId,
       teamId: DEMO_TEAM_ID,
       displayName,
-      slackUserId: body.user_id,
+      slackUserId: userId,
       joinedAt: new Date(),
       interests: [],
       optedIn: true,
@@ -182,11 +170,53 @@ app.command('/butuh', async ({ ack, body, client }) => {
     await repo.savePerson(person);
   }
 
-  // Demo tak punya scheduler mingguan: simulasikan "route tick sudah jalan" begitu need masuk,
-  // lewat runWeekly yang sama persis dipakai produksi — supaya benar batch-match ke roster lain,
-  // bukan echo balik ke pengirim.
+  const dmConfirm = `Dicatat: "${text}" — lagi dicocokkan ke tim, tunggu sebentar ya.`;
+  if (echoChannelId) {
+    try {
+      await client.chat.postMessage({
+        channel: echoChannelId,
+        text: `📝 <@${userId}> ajukan kebutuhan: "${text}" — lagi dicocokkan ke tim.`,
+      });
+    } catch {
+      await client.chat.postMessage({ channel: userId, text: dmConfirm });
+    }
+  } else {
+    await client.chat.postMessage({ channel: userId, text: dmConfirm });
+  }
+
   await harvester.collect(DEMO_TEAM_ID, 'member', text, DEMO_WEEK);
-  await runWeekly({ repo, messaging, parser, composer }, DEMO_TEAM_ID, DEMO_WEEK, cycleOf(new Date()));
+  const result = await runWeekly({ repo, messaging, parser, composer }, DEMO_TEAM_ID, DEMO_WEEK, cycleOf(new Date()));
+  if (result.delivered.length === 0) {
+    await client.chat.postMessage({
+      channel: userId,
+      text: 'Belum ada slot yang pas buat kebutuhan itu sekarang — coba lagi nanti.',
+    });
+  }
+}
+
+app.command('/butuh', async ({ ack, body, client }) => {
+  await ack();
+  const text = body.text?.trim();
+  if (!text) {
+    await client.chat.postMessage({
+      channel: body.user_id,
+      text: 'Ketik kebutuhannya setelah /butuh, ya. Contoh: /butuh 1 lagi buat futsal sore ini di GOR Kampus.',
+    });
+    return;
+  }
+  await submitNeed(client, body.user_id, text, body.channel_id);
+});
+
+app.message(async ({ message, client, say }) => {
+  const m = message as { subtype?: string; channel_type?: string; user?: string; text?: string };
+  if (m.subtype || m.channel_type !== 'im' || !m.user || !m.text) return;
+
+  const text = m.text.trim();
+  if (!looksLikeNeed(text)) {
+    await say('Kalau ini kebutuhan aktivitas tim, sebutin kegiatan + jumlah orang ya (misal: "butuh 2 orang buat basket sore ini"). Atau pakai /butuh.');
+    return;
+  }
+  await submitNeed(client, m.user, text);
 });
 
 app.command('/konsultasi', async ({ ack, body, client }) => {

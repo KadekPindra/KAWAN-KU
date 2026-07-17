@@ -42,14 +42,30 @@ export class ScreeningService {
     now: Date = new Date(),
     cfg: Config = config,
   ): Promise<void> {
-    for (const p of await this.repo.listPeople(teamId)) {
-      if (!p.optedIn) continue;
-      if (await this.repo.getScreening(teamId, p.id, cycle)) continue;
-      if (!(await this.isDue(teamId, p.id, now, cfg))) continue;
+    const people = await this.repo.listPeople(teamId);
+    console.log(`[screening] deliver: ${people.length} orang di roster (teamId=${teamId}, cycle=${cycle})`);
+    for (const p of people) {
+      if (!p.optedIn) {
+        console.log(`[screening] skip ${p.id} (${p.displayName}): belum opt-in`);
+        continue;
+      }
+      if (await this.repo.getScreening(teamId, p.id, cycle)) {
+        console.log(`[screening] skip ${p.id} (${p.displayName}): sudah ada screening buat cycle ${cycle}`);
+        continue;
+      }
+      if (!(await this.isDue(teamId, p.id, now, cfg))) {
+        console.log(`[screening] skip ${p.id} (${p.displayName}): belum due`);
+        continue;
+      }
       const s = blank(teamId, p.id, cycle, now);
       s.deliveredAt = now;
       await this.repo.saveScreening(s);
-      await this.messaging.postScreening(p.id, cycle);
+      try {
+        await this.messaging.postScreening(p.id, cycle);
+        console.log(`[screening] SENT -> ${p.id} (${p.displayName})`);
+      } catch (err) {
+        console.error(`[screening] GAGAL kirim -> ${p.id} (${p.displayName}):`, err);
+      }
     }
   }
 

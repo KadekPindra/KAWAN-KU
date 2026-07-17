@@ -41,11 +41,13 @@ export class Scheduler {
 
   async screenTick(now: Date = new Date()): Promise<void> {
     const cycle = cycleOf(now);
+    console.log(`[scheduler] screenTick @ ${now.toISOString()} (cycle ${cycle})`);
     await this.deps.screening.deliver(this.target.teamId, cycle, now);
     await runMonthly(this.deps, this.target.teamId, cycle);
   }
 
   async routeTick(now: Date = new Date()): Promise<void> {
+    console.log(`[scheduler] routeTick @ ${now.toISOString()}`);
     await runWeekly(this.deps, this.target.teamId, this.target.week, cycleOf(now), now);
   }
 
@@ -56,8 +58,16 @@ export class Scheduler {
   }
 
   start(): void {
-    this.timers.push(setInterval(() => void this.screenTick(), this.intervals.screenTickMs));
-    this.timers.push(setInterval(() => void this.routeTick(), this.intervals.routeTickMs));
+    this.timers.push(
+      setInterval(() => {
+        this.screenTick().catch((err) => console.error('[scheduler] screenTick error:', err));
+      }, this.intervals.screenTickMs),
+    );
+    this.timers.push(
+      setInterval(() => {
+        this.routeTick().catch((err) => console.error('[scheduler] routeTick error:', err));
+      }, this.intervals.routeTickMs),
+    );
   }
 
   stop(): void {

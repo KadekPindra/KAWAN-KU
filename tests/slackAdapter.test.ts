@@ -1,25 +1,34 @@
 import { describe, it, expect } from 'vitest';
 import type { App } from '@slack/bolt';
+import type { KnownBlock } from '@slack/types';
 import {
   SlackAdapter,
   parseAction,
-  screeningBlocks,
+  questionBlocks,
   poolBlocks,
   welcomeBlocks,
+  markQuestionAnswered,
 } from '../src/adapters/slack/slackAdapter';
 import { PortalAdapter } from '../src/adapters/portal/portalAdapter';
 import type { SlackDirectory } from '../src/adapters/slack/directory';
 import type { InboundEvent } from '../src/ports/messaging';
 import type { Need } from '../src/domain/types';
 
+type ActionBody = {
+  user?: { id?: string };
+  channel?: { id?: string };
+  message?: { ts?: string; blocks?: KnownBlock[]; attachments?: { color?: string; blocks?: KnownBlock[] }[] };
+};
+
 type ActionHandler = (args: {
   ack: () => Promise<void>;
   action: { action_id?: string; value?: string };
-  body: { user?: { id?: string } };
+  body: ActionBody;
 }) => Promise<void>;
 
 function fakeApp(realName = 'Dewi') {
-  const posts: Array<{ channel?: string; blocks?: unknown[] }> = [];
+  const posts: Array<{ channel?: string; blocks?: unknown[]; attachments?: { blocks?: unknown[] }[] }> = [];
+  const updates: Array<{ channel?: string; ts?: string; blocks?: unknown[]; attachments?: { blocks?: unknown[] }[] }> = [];
   let handler: ActionHandler | undefined;
   const app = {
     action: (_m: RegExp, h: ActionHandler) => {
@@ -34,10 +43,14 @@ function fakeApp(realName = 'Dewi') {
           posts.push(m);
           return { ok: true };
         },
+        update: async (m: { channel?: string; ts?: string; blocks?: unknown[] }) => {
+          updates.push(m);
+          return { ok: true };
+        },
       },
     },
   } as unknown as App;
-  return { app, posts, fire: (a: Parameters<ActionHandler>[0]) => handler!(a) };
+  return { app, posts, updates, fire: (a: Parameters<ActionHandler>[0]) => handler!(a) };
 }
 
 const RECIPIENTS = [
@@ -79,22 +92,27 @@ describe('parseAction', () => {
 });
 
 describe('block builders', () => {
-  it('risk item hanya muncul saat consent', () => {
-    const withConsent = JSON.stringify(screeningBlocks('2026-06', true));
-    const without = JSON.stringify(screeningBlocks('2026-06', false));
-    expect(withConsent).toContain('risk_yes');
-    expect(without).not.toContain('risk_yes');
-  });
   it('welcomeBlocks menyapa pakai nama + institusi', () => {
     const blocks = JSON.stringify(welcomeBlocks('Dewi', 'Garuda Corp'));
     expect(blocks).toContain('Dewi');
     expect(blocks).toContain('Garuda Corp');
   });
-  it('poolBlocks pakai copy + action claim membawa needId', () => {
-    const blocks = JSON.stringify(poolBlocks({ needFramed: 'Tim futsal kurang 1 orang.', claimLabel: 'Isi slot' }, 'need-x'));
+  it('poolBlocks pakai copy + action claim/decline membawa needId', () => {
+    const need = { parsed: { location: 'GOR', when: 'sore ini' } } as Need;
+    const blocks = JSON.stringify(
+      poolBlocks(need, { problem: 'Ada yang butuh 1 orang.', needFramed: 'Tim futsal kurang 1 orang.', claimLabel: 'Isi slot' }, 'need-x'),
+    );
     expect(blocks).toContain('Tim futsal kurang 1 orang.');
     expect(blocks).toContain('Isi slot');
     expect(blocks).toContain('need-x');
+  });
+
+  it('markQuestionAnswered mengganti baris tombol pertanyaan itu jadi teks terkunci', () => {
+    const blocks = questionBlocks('2026-06', 1);
+    const locked = markQuestionAnswered(blocks, 1, 3);
+    const actions = JSON.stringify(locked[1]);
+    expect(actions).not.toContain('screen_1_');
+    expect(actions).toContain('Often');
   });
 });
 
@@ -131,19 +149,48 @@ describe('SlackAdapter', () => {
     expect(JSON.stringify(posts[0].blocks)).toContain('Dewi Anjani');
   });
 
-  it('postScreening DM ke satu orang (per orang, bukan broadcast)', async () => {
+  it('postScreening DM ke satu orang (per orang, bukan broadcast), blocks dibungkus attachment hijau', async () => {
     const { app, posts } = fakeApp();
     const adapter = new SlackAdapter(app, directory);
     await adapter.postScreening('p1', '2026-06');
     await adapter.postScreening('p2', '2026-06');
     await adapter.postScreening('pX', '2026-06'); // tak dikenal → tak ada DM
-    expect(posts.map((p) => p.channel)).toEqual(['U1', 'U2']);
+    // p1 (riskConsent) dpt 3 pertanyaan + 1 risk item; p2 dpt 3 pertanyaan saja.
+    expect(posts.map((p) => p.channel)).toEqual(['U1', 'U1', 'U1', 'U1', 'U2', 'U2', 'U2']);
+    expect(posts[0].attachments?.[0]?.blocks).toBeDefined();
+    expect(posts[0].blocks).toBeUndefined();
+  });
+
+  it('menjawab pertanyaan (attachments-wrapped) mengunci tombol lewat chat.update', async () => {
+    const { app, fire, updates } = fakeApp();
+    const adapter = new SlackAdapter(app, directory);
+    const blocks = questionBlocks('2026-06', 1);
+
+    await fire({
+      ack: async () => {},
+      action: { action_id: 'screen_1_3', value: '2026-06' },
+      body: {
+        user: { id: 'U1' },
+        channel: { id: 'U1' },
+        message: { ts: '111.222', attachments: [{ color: '#2EB67D', blocks }] },
+      },
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ channel: 'U1', ts: '111.222' });
+    const updatedBlocks = JSON.stringify(updates[0].attachments?.[0]?.blocks);
+    expect(updatedBlocks).not.toContain('screen_1_');
+    expect(updatedBlocks).toContain('Often');
   });
 
   it('deliverPool lewati orang tanpa slack id', async () => {
     const { app, posts } = fakeApp();
     const adapter = new SlackAdapter(app, directory);
-    await adapter.deliverPool({ id: 'need-x' } as Need, ['p1', 'p2', 'pX'], { needFramed: 'Tim kurang 1', claimLabel: 'Isi' });
+    await adapter.deliverPool({ id: 'need-x' } as Need, ['p1', 'p2', 'pX'], {
+      problem: 'Ada yang butuh 1 orang.',
+      needFramed: 'Tim kurang 1',
+      claimLabel: 'Isi',
+    });
     expect(posts.map((p) => p.channel)).toEqual(['U1', 'U2']);
   });
 });
@@ -153,9 +200,9 @@ describe('PortalAdapter (stub)', () => {
     const portal = new PortalAdapter();
     await expect(portal.sendWelcome('p1')).rejects.toThrow('NotImplemented');
     await expect(portal.postScreening('T', '2026-06')).rejects.toThrow('NotImplemented');
-    await expect(portal.deliverPool({ id: 'n' } as Need, ['p1'], { needFramed: 'x', claimLabel: 'y' })).rejects.toThrow(
-      'NotImplemented',
-    );
+    await expect(
+      portal.deliverPool({ id: 'n' } as Need, ['p1'], { problem: 'p', needFramed: 'x', claimLabel: 'y' }),
+    ).rejects.toThrow('NotImplemented');
     await expect(portal.openClinicalDoor('p1')).rejects.toThrow('NotImplemented');
     expect(() => portal.receiveResponse()).toThrow('NotImplemented');
   });

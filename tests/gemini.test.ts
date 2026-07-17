@@ -15,7 +15,7 @@ function need(): Need {
     teamId: 'T',
     source: 'member',
     rawText: 'butuh 1 lagi buat futsal jam 5 sore, yang penting bisa lari',
-    parsed: { activity: 'futsal', skill: 'casual', slots: 1, when: 'jam 5 sore', effort: 'low' },
+    parsed: { activity: 'futsal', skill: 'casual', slots: 1, when: 'jam 5 sore', location: '', effort: 'low' },
     slotsTotal: 1,
     slotsOpen: 1,
     week: '2026-W29',
@@ -48,7 +48,7 @@ describe('GeminiNeedParser', () => {
       JSON.stringify({ activity: 'Futsal', skill: 'casual', slots: 3, when: 'jam 5 sore', effort: 'low' }),
     );
     const parsed = await new GeminiNeedParser(client).parse('butuh 3 orang futsal');
-    expect(parsed).toEqual({ activity: 'futsal', skill: 'casual', slots: 3, when: 'jam 5 sore', effort: 'low' });
+    expect(parsed).toEqual({ activity: 'futsal', skill: 'casual', slots: 3, when: 'jam 5 sore', location: '', effort: 'low' });
   });
 
   it('JSON invalid => fallback template', async () => {
@@ -71,20 +71,33 @@ describe('GeminiInviteComposer', () => {
   });
 
   it('output kebutuhan valid => dipakai apa adanya', async () => {
-    const client = fakeClient(JSON.stringify({ needFramed: 'Tim futsal kurang 1 orang buat sore ini.', claimLabel: 'Isi slot' }));
+    const client = fakeClient(
+      JSON.stringify({
+        problem: 'Ada yang baru butuh 1 orang buat futsal.',
+        needFramed: 'Tim futsal kurang 1 orang buat sore ini.',
+        claimLabel: 'Isi slot',
+      }),
+    );
     const copy = await new GeminiInviteComposer(client).compose(need());
+    expect(copy.problem).toContain('butuh');
     expect(copy.needFramed).toContain('kurang');
     expect(copy.claimLabel).toBe('Isi slot');
   });
 
   it('output ber-ajakan ("yuk") langgar kontrak => fallback template', async () => {
-    const client = fakeClient(JSON.stringify({ needFramed: 'Ada futsal sore ini, ikut yuk!', claimLabel: 'Ikut' }));
+    const client = fakeClient(
+      JSON.stringify({
+        problem: 'Ada yang baru butuh 1 orang buat futsal.',
+        needFramed: 'Ada futsal sore ini, ikut yuk!',
+        claimLabel: 'Ikut',
+      }),
+    );
     const copy = await new GeminiInviteComposer(client).compose(need());
     expect(copy.needFramed).toBe(needFramedTemplate(need()));
   });
 
   it('output kosong => fallback template', async () => {
-    const client = fakeClient(JSON.stringify({ needFramed: '', claimLabel: 'x' }));
+    const client = fakeClient(JSON.stringify({ problem: 'Ada yang baru butuh 1 orang.', needFramed: '', claimLabel: 'x' }));
     const copy = await new GeminiInviteComposer(client).compose(need());
     expect(copy.needFramed).toBe(needFramedTemplate(need()));
   });

@@ -2,16 +2,24 @@ import { App } from '@slack/bolt';
 import type { Need, Person } from '../../domain/types';
 import { config } from '../../config/index';
 import { createRepository } from '../repositoryFactory';
-import { createGeminiClient, GeminiInviteComposer } from '../llm/gemini';
+import { createGeminiClient, GeminiInviteComposer, GeminiNeedParser } from '../llm/gemini';
 import { ScreeningService } from '../../core/screening';
 import { NeedHarvester } from '../../core/needHarvester';
 import { ClaimService, OutcomeLog } from '../../core/claim';
 import { ClinicalRouter } from '../../core/clinicalRouter';
+import { ReverseMatchService } from '../../core/reverseMatch';
 import { handleInbound } from '../../pipelines/continuous';
+import { runWeekly } from '../../pipelines/weekly';
 import { cycleOf } from '../../pipelines/scheduler';
 import { DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
 import { RepoSlackDirectory } from './directory';
-import { SlackAdapter, questionBlocks, poolBlocks, welcomeBlocks, resolveDisplayName } from './slackAdapter';
+import {
+  SlackAdapter,
+  questionBlocks,
+  welcomeBlocks,
+  resolveDisplayName,
+  SCREEN_ACCENT_COLOR,
+} from './slackAdapter';
 
 const { SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_SIGNING_SECRET } = process.env;
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
@@ -30,7 +38,7 @@ const demoNeed: Need = {
   teamId: DEMO_TEAM_ID,
   source: 'member',
   rawText: 'butuh 1 lagi buat futsal sore ini, yang penting bisa lari',
-  parsed: { activity: 'futsal', skill: 'casual', slots: 1, when: 'sore ini', effort: 'low' },
+  parsed: { activity: 'futsal', skill: 'casual', slots: 1, when: 'sore ini', location: 'GOR Kampus', effort: 'low' },
   slotsTotal: 1,
   slotsOpen: 1,
   week: DEMO_WEEK,
@@ -48,11 +56,14 @@ const app = new App({
 
 const directory = new RepoSlackDirectory(repo, DEMO_TEAM_ID);
 const messaging = new SlackAdapter(app, directory);
-const composer = new GeminiInviteComposer(createGeminiClient());
+const gemini = createGeminiClient();
+const parser = new GeminiNeedParser(gemini);
+const composer = new GeminiInviteComposer(gemini);
 const screening = new ScreeningService(repo, messaging);
 const harvester = new NeedHarvester(repo);
 const claim = new ClaimService(repo, new OutcomeLog(repo));
 const clinical = new ClinicalRouter(repo, messaging);
+const reverseMatch = new ReverseMatchService(repo, messaging, parser, composer);
 
 app.command('/kawanku', async ({ ack, body, client }) => {
   await ack();
@@ -83,14 +94,49 @@ app.command('/kawanku', async ({ ack, body, client }) => {
 
   await client.chat.postMessage({
     channel,
-    text: 'Cek singkat (1 pertanyaan)',
-    blocks: questionBlocks(cycle, 1),
+    text: 'Weekly Vibe Check',
+    attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: questionBlocks(cycle, 1, true) }],
   });
+});
+
+app.command('/butuh', async ({ ack, body, client }) => {
+  await ack();
+  const text = body.text?.trim();
+  if (!text) {
+    // DM, bukan postEphemeral ke channel_id: /butuh bisa dipanggil dari channel mana pun yang
+    // bot belum tentu jadi anggotanya (postEphemeral ke channel asing -> not_in_channel).
+    await client.chat.postMessage({
+      channel: body.user_id,
+      text: 'Ketik kebutuhannya setelah /butuh, ya. Contoh: /butuh 1 lagi buat futsal sore ini di GOR Kampus.',
+    });
+    return;
+  }
+
+  if (!(await directory.personIdFor(body.user_id))) {
+    const displayName = await resolveDisplayName(client, body.user_id);
+    const person: Person = {
+      id: body.user_id,
+      teamId: DEMO_TEAM_ID,
+      displayName,
+      slackUserId: body.user_id,
+      joinedAt: new Date(),
+      interests: [],
+      optedIn: true,
+      riskConsent: false,
+    };
+    await repo.savePerson(person);
+  }
+
+  // Demo tak punya scheduler mingguan: simulasikan "route tick sudah jalan" begitu need masuk,
+  // lewat runWeekly yang sama persis dipakai produksi — supaya benar batch-match ke roster lain,
+  // bukan echo balik ke pengirim.
+  await harvester.collect(DEMO_TEAM_ID, 'member', text, DEMO_WEEK);
+  await runWeekly({ repo, messaging, parser, composer }, DEMO_TEAM_ID, DEMO_WEEK, cycleOf(new Date()));
 });
 
 void (async () => {
   for await (const event of messaging.receiveResponse()) {
-    await handleInbound({ teamId: DEMO_TEAM_ID, week: DEMO_WEEK, screening, harvester, claim, clinical }, event);
+    await handleInbound({ teamId: DEMO_TEAM_ID, week: DEMO_WEEK, screening, harvester, claim, clinical, reverseMatch }, event);
     if (event.kind === 'screenAnswer' && event.q === 1) {
       const copy = await composer.compose(demoNeed);
       await messaging.deliverPool(demoNeed, [event.personId], copy);
@@ -99,4 +145,6 @@ void (async () => {
 })();
 
 await app.start();
-console.log('KAWAN DEMO jalan (Socket Mode). Ketik /kawanku untuk: sambutan → 1 pertanyaan → langsung tawaran aktivitas.');
+console.log(
+  'KAWAN DEMO jalan (Socket Mode). /kawanku: sambutan → 1 pertanyaan → tawaran aktivitas. /butuh <teks>: ajukan kebutuhan sendiri.',
+);

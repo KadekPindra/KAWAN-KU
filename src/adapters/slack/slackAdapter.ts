@@ -7,14 +7,18 @@ import { config } from '../../config/index';
 import type { SlackDirectory } from './directory';
 
 export const UCLA3_ITEMS: Record<1 | 2 | 3, string> = {
-  1: 'Seberapa sering kamu merasa kurang punya teman untuk berbagi?',
-  2: 'Seberapa sering kamu merasa tersisih dari orang-orang di sekitarmu?',
-  3: 'Seberapa sering kamu merasa jauh dari orang lain?',
+  1: 'Time for a quick screen break! Just out of curiosity, how often do you feel that you lack companionship outside of work lately?',
+  2: 'And how often do you feel left out or excluded by the people around you?',
+  3: "Last one — how often do you feel distant from the people around you these days?",
 };
 
-export const UCLA3_ANCHORS: Record<Anchor, string> = { 1: 'Jarang', 2: 'Kadang', 3: 'Sering' };
+export const UCLA3_ANCHORS: Record<Anchor, string> = { 1: 'Rarely', 2: 'Sometimes', 3: 'Often' };
 
-const RISK_ITEM = 'Dalam 2 minggu terakhir, apakah kamu ingin bicara dengan seseorang soal perasaanmu?';
+export const SCREEN_GREETING = 'Weekly Vibe Check 🌿';
+
+export const SCREEN_ACCENT_COLOR = '#2EB67D';
+
+const RISK_ITEM = "In the past 2 weeks, is there anyone you've wanted to talk to about how you're feeling?";
 
 function isAnchor(n: number): n is Anchor {
   return n === 1 || n === 2 || n === 3;
@@ -30,13 +34,14 @@ export function parseAction(actionId: string, value: string | undefined, personI
     return { kind: 'screenAnswer', personId, cycle, q: qn as 1 | 2 | 3, value: vn };
   }
   if (actionId === 'claim') return value ? { kind: 'claim', personId, needId: value } : null;
+  if (actionId === 'decline') return value ? { kind: 'decline', personId, needId: value } : null;
   if (actionId === 'risk_yes') return { kind: 'riskItem', personId, positive: true };
   if (actionId === 'risk_no') return { kind: 'riskItem', personId, positive: false };
   if (actionId === 'self_referral') return { kind: 'selfReferral', personId };
   return null;
 }
 
-const ACTION_MATCH = /^(screen_[123]_[123]|claim|risk_yes|risk_no|self_referral)$/;
+const ACTION_MATCH = /^(screen_[123]_[123]|claim|decline|risk_yes|risk_no|self_referral)$/;
 
 class InboundQueue {
   private buffer: InboundEvent[] = [];
@@ -79,38 +84,70 @@ function textBtn(text: string, actionId: string, value?: string, style?: 'primar
   };
 }
 
-export function questionBlocks(cycle: Cycle, q: 1 | 2 | 3): KnownBlock[] {
-  return [
-    { type: 'section', text: { type: 'mrkdwn', text: `*${q}.* ${UCLA3_ITEMS[q]}` } },
+export function questionBlocks(cycle: Cycle, q: 1 | 2 | 3, withGreeting = false): KnownBlock[] {
+  const blocks: KnownBlock[] = [];
+  if (withGreeting) {
+    blocks.push({ type: 'header', text: { type: 'plain_text', text: SCREEN_GREETING, emoji: true } });
+  }
+  blocks.push(
+    { type: 'section', text: { type: 'mrkdwn', text: UCLA3_ITEMS[q] } },
     {
       type: 'actions',
       elements: ([1, 2, 3] as Anchor[]).map((v) => textBtn(UCLA3_ANCHORS[v], `screen_${q}_${v}`, cycle)),
     },
-  ];
-}
-
-export function screeningBlocks(cycle: Cycle, riskConsent: boolean): KnownBlock[] {
-  const blocks: KnownBlock[] = [
-    { type: 'section', text: { type: 'mrkdwn', text: 'Cek singkat bulanan (3 pertanyaan, sekali tap):' } },
-    ...questionBlocks(cycle, 1),
-    ...questionBlocks(cycle, 2),
-    ...questionBlocks(cycle, 3),
-  ];
-  if (riskConsent) {
-    blocks.push(
-      { type: 'divider' },
-      { type: 'section', text: { type: 'mrkdwn', text: RISK_ITEM } },
-      { type: 'actions', elements: [textBtn('Ya', 'risk_yes'), textBtn('Tidak', 'risk_no')] },
-    );
-  }
+  );
   return blocks;
 }
 
-export function poolBlocks(copy: InviteCopy, needId: string): KnownBlock[] {
+export function riskItemBlocks(): KnownBlock[] {
   return [
-    { type: 'section', text: { type: 'mrkdwn', text: copy.needFramed } },
-    { type: 'actions', elements: [textBtn(copy.claimLabel, 'claim', needId, 'primary')] },
+    { type: 'section', text: { type: 'mrkdwn', text: RISK_ITEM } },
+    { type: 'actions', elements: [textBtn('Yes', 'risk_yes'), textBtn('No', 'risk_no')] },
   ];
+}
+
+function isQuestionActionsBlock(b: KnownBlock, q: 1 | 2 | 3): boolean {
+  return (
+    b.type === 'actions' &&
+    Array.isArray(b.elements) &&
+    b.elements.some((el) => 'action_id' in el && typeof el.action_id === 'string' && el.action_id.startsWith(`screen_${q}_`))
+  );
+}
+
+// Kunci pertanyaan yang sudah dijawab: ganti baris tombol jadi teks statis supaya tak bisa di-tap ulang.
+export function markQuestionAnswered(blocks: KnownBlock[], q: 1 | 2 | 3, chosen: Anchor): KnownBlock[] {
+  return blocks.map((b) =>
+    isQuestionActionsBlock(b, q)
+      ? { type: 'context', elements: [{ type: 'mrkdwn', text: `✅ Jawaban kamu: *${UCLA3_ANCHORS[chosen]}*` }] }
+      : b,
+  );
+}
+
+export const DECLINE_LABEL = 'Lain kali';
+
+function contextLine(need: Need): KnownBlock | null {
+  const parts: string[] = [];
+  if (need.parsed?.location) parts.push(`📍 ${need.parsed.location}`);
+  if (need.parsed?.when) parts.push(`⏰ ${need.parsed.when}`);
+  if (!parts.length) return null;
+  return { type: 'context', elements: [{ type: 'mrkdwn', text: parts.join('  |  ') }] };
+}
+
+export function poolBlocks(need: Need, copy: InviteCopy, needId: string): KnownBlock[] {
+  const blocks: KnownBlock[] = [{ type: 'section', text: { type: 'mrkdwn', text: copy.problem } }];
+  const context = contextLine(need);
+  if (context) blocks.push(context);
+  blocks.push(
+    { type: 'section', text: { type: 'mrkdwn', text: copy.needFramed } },
+    {
+      type: 'actions',
+      elements: [
+        textBtn(copy.claimLabel, 'claim', needId, 'primary'),
+        textBtn(DECLINE_LABEL, 'decline', needId, 'danger'),
+      ],
+    },
+  );
+  return blocks;
 }
 
 export function welcomeBlocks(displayName: string, institutionName: string): KnownBlock[] {
@@ -119,14 +156,14 @@ export function welcomeBlocks(displayName: string, institutionName: string): Kno
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `👋 Hai ${displayName}! Selamat datang di *${institutionName}*, aku Kawanku, teman kecilmu yang ramah di workspace ini.`,
+        text: `👋 Hi ${displayName}! welcome to *${institutionName}*, I'm Kawanku, your friendly little companion in this workspace.`,
       },
     },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: 'Aku di sini buat bantu kamu settle in, dan berbagi info kegiatan kantor maupun komunitas. Jangan sungkan kalau mau tanya-tanya soal kegiatan kantor dan komunitas!',
+        text: "I'm just here to help you settle in, share updates about office and community activities. feel free if you want to ask about the office and community activities!",
       },
     },
   ];
@@ -164,13 +201,47 @@ export class SlackAdapter implements MessagingPort {
     this.app.action(ACTION_MATCH, async ({ ack, action, body }) => {
       await ack();
       const a = action as { action_id?: string; value?: string };
-      const slackUserId = (body as { user?: { id?: string } }).user?.id;
+      const b = body as {
+        user?: { id?: string };
+        channel?: { id?: string };
+        message?: { ts?: string; blocks?: KnownBlock[]; attachments?: { color?: string; blocks?: KnownBlock[] }[] };
+      };
+      const slackUserId = b.user?.id;
       if (!a.action_id || !slackUserId) return;
       const personId = await this.directory.personIdFor(slackUserId);
       if (!personId) return;
       const event = parseAction(a.action_id, a.value, personId);
       if (event) this.queue.push(event);
+      if (event?.kind === 'screenAnswer') {
+        await this.lockAnsweredQuestion(b.channel?.id, b.message, event.q, event.value);
+      }
     });
+  }
+
+  private async lockAnsweredQuestion(
+    channel: string | undefined,
+    message: { ts?: string; blocks?: KnownBlock[]; attachments?: { color?: string; blocks?: KnownBlock[] }[] } | undefined,
+    q: 1 | 2 | 3,
+    chosen: Anchor,
+  ): Promise<void> {
+    if (!channel || !message?.ts) return;
+    const attachment = message.attachments?.[0];
+    if (attachment?.blocks) {
+      await this.app.client.chat.update({
+        channel,
+        ts: message.ts,
+        text: ' ',
+        attachments: [{ color: attachment.color, blocks: markQuestionAnswered(attachment.blocks, q, chosen) }],
+      });
+      return;
+    }
+    if (message.blocks) {
+      await this.app.client.chat.update({
+        channel,
+        ts: message.ts,
+        blocks: markQuestionAnswered(message.blocks, q, chosen),
+      });
+    }
   }
 
   async sendWelcome(personId: string): Promise<void> {
@@ -187,11 +258,20 @@ export class SlackAdapter implements MessagingPort {
   async postScreening(personId: string, cycle: Cycle): Promise<void> {
     const r = await this.directory.recipientFor(personId);
     if (!r) return;
-    await this.app.client.chat.postMessage({
-      channel: r.slackUserId,
-      text: 'Cek singkat',
-      blocks: screeningBlocks(cycle, r.riskConsent),
-    });
+    for (const q of [1, 2, 3] as const) {
+      await this.app.client.chat.postMessage({
+        channel: r.slackUserId,
+        text: UCLA3_ITEMS[q],
+        attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: questionBlocks(cycle, q, q === 1) }],
+      });
+    }
+    if (r.riskConsent) {
+      await this.app.client.chat.postMessage({
+        channel: r.slackUserId,
+        text: RISK_ITEM,
+        attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: riskItemBlocks() }],
+      });
+    }
   }
 
   async deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void> {
@@ -201,7 +281,7 @@ export class SlackAdapter implements MessagingPort {
       await this.app.client.chat.postMessage({
         channel: slackUserId,
         text: copy.needFramed,
-        blocks: poolBlocks(copy, need.id),
+        attachments: [{ color: SCREEN_ACCENT_COLOR, blocks: poolBlocks(need, copy, need.id) }],
       });
     }
   }

@@ -8,7 +8,7 @@ function need(): Need {
     teamId: 'T',
     source: 'member',
     rawText: 'raw',
-    parsed: { activity: 'futsal', skill: 'casual', slots: 1, when: 'jam 5 sore', effort: 'low' },
+    parsed: { activity: 'futsal', skill: 'casual', slots: 1, when: 'jam 5 sore', location: '', effort: 'low' },
     slotsTotal: 1,
     slotsOpen: 1,
     week: '2026-W29',
@@ -29,8 +29,9 @@ describe('InviteComposer — kontrak ❌/✅', () => {
     expect(invitationTemplate(need()).toLowerCase()).toContain('yuk');
   });
 
-  it('compose mengembalikan copy + label klaim', async () => {
+  it('compose mengembalikan problem + copy kebutuhan + label klaim', async () => {
     const copy = await new TemplateInviteComposer().compose(need());
+    expect(copy.problem.length).toBeGreaterThan(0);
     expect(copy.needFramed).toContain('kurang');
     expect(copy.claimLabel.length).toBeGreaterThan(0);
   });

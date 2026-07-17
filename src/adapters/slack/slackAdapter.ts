@@ -3,6 +3,7 @@ import type { KnownBlock } from '@slack/types';
 import type { Anchor, Cycle, InviteCopy, Need } from '../../domain/types';
 import type { InboundEvent, MessagingPort } from '../../ports/messaging';
 import { CRISIS_RESOURCES } from '../../core/clinicalRouter';
+import { config } from '../../config/index';
 import type { SlackDirectory } from './directory';
 
 export const UCLA3_ITEMS: Record<1 | 2 | 3, string> = {
@@ -78,7 +79,7 @@ function textBtn(text: string, actionId: string, value?: string, style?: 'primar
   };
 }
 
-function questionBlocks(cycle: Cycle, q: 1 | 2 | 3): KnownBlock[] {
+export function questionBlocks(cycle: Cycle, q: 1 | 2 | 3): KnownBlock[] {
   return [
     { type: 'section', text: { type: 'mrkdwn', text: `*${q}.* ${UCLA3_ITEMS[q]}` } },
     {
@@ -112,6 +113,25 @@ export function poolBlocks(copy: InviteCopy, needId: string): KnownBlock[] {
   ];
 }
 
+export function welcomeBlocks(displayName: string, institutionName: string): KnownBlock[] {
+  return [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `👋 Hai ${displayName}! Selamat datang di *${institutionName}*, aku Kawanku, teman kecilmu yang ramah di workspace ini.`,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: 'Aku di sini buat bantu kamu settle in, dan berbagi info kegiatan kantor maupun komunitas. Jangan sungkan kalau mau tanya-tanya soal kegiatan kantor dan komunitas!',
+      },
+    },
+  ];
+}
+
 export function clinicalBlocks(): KnownBlock[] {
   const list = CRISIS_RESOURCES.map((r) => `• ${r}`).join('\n');
   return [
@@ -141,6 +161,18 @@ export class SlackAdapter implements MessagingPort {
       if (!personId) return;
       const event = parseAction(a.action_id, a.value, personId);
       if (event) this.queue.push(event);
+    });
+  }
+
+  async sendWelcome(personId: string): Promise<void> {
+    const slackUserId = await this.directory.slackIdFor(personId);
+    if (!slackUserId) return;
+    const info = await this.app.client.users.info({ user: slackUserId });
+    const displayName = info.user?.profile?.real_name || info.user?.real_name || info.user?.name || 'kamu';
+    await this.app.client.chat.postMessage({
+      channel: slackUserId,
+      text: 'Selamat datang',
+      blocks: welcomeBlocks(displayName, config.INSTITUTION_NAME),
     });
   }
 

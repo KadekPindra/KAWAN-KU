@@ -3,11 +3,13 @@ import { InMemoryMessaging } from '../src/adapters/inMemory/messaging';
 import type { InboundEvent } from '../src/ports/messaging';
 
 describe('InMemoryMessaging', () => {
-  it('mencatat outbound: screening, pool, pintu klinis', async () => {
+  it('mencatat outbound: sambutan, screening, pool, pintu klinis', async () => {
     const m = new InMemoryMessaging();
+    await m.sendWelcome('p1');
     await m.postScreening('p1', '2026-01');
     await m.openClinicalDoor('u1');
 
+    expect(m.welcomes).toEqual(['p1']);
     expect(m.postedScreenings).toEqual([{ personId: 'p1', cycle: '2026-01' }]);
     expect(m.clinicalDoors).toEqual(['u1']);
   });

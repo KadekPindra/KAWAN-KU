@@ -5,6 +5,7 @@ type PostedScreening = { personId: string; cycle: Cycle };
 type DeliveredPool = { need: Need; userIds: string[]; copy: InviteCopy };
 
 export class InMemoryMessaging implements MessagingPort {
+  readonly welcomes: string[] = [];
   readonly postedScreenings: PostedScreening[] = [];
   readonly deliveredPools: DeliveredPool[] = [];
   readonly clinicalDoors: string[] = [];
@@ -13,6 +14,9 @@ export class InMemoryMessaging implements MessagingPort {
   private waiting: ((r: IteratorResult<InboundEvent>) => void)[] = [];
   private closed = false;
 
+  async sendWelcome(personId: string): Promise<void> {
+    this.welcomes.push(personId);
+  }
   async postScreening(personId: string, cycle: Cycle): Promise<void> {
     this.postedScreenings.push({ personId, cycle });
   }

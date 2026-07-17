@@ -3,6 +3,7 @@ import { config } from '../src/config/index';
 
 describe('config §9', () => {
   it('memuat default tunable sesuai tech-spec', () => {
+    expect(config.INSTITUTION_NAME).toBeTruthy();
     expect(config.LONELY_THRESHOLD).toBe(6);
     expect(config.CLINICAL_CYCLES).toBe(3);
     expect(config.SCREEN_CADENCE).toBe('monthly');

@@ -5,6 +5,7 @@ import {
   parseAction,
   screeningBlocks,
   poolBlocks,
+  welcomeBlocks,
 } from '../src/adapters/slack/slackAdapter';
 import { PortalAdapter } from '../src/adapters/portal/portalAdapter';
 import type { SlackDirectory } from '../src/adapters/slack/directory';
@@ -17,7 +18,7 @@ type ActionHandler = (args: {
   body: { user?: { id?: string } };
 }) => Promise<void>;
 
-function fakeApp() {
+function fakeApp(realName = 'Dewi') {
   const posts: Array<{ channel?: string; blocks?: unknown[] }> = [];
   let handler: ActionHandler | undefined;
   const app = {
@@ -25,6 +26,9 @@ function fakeApp() {
       handler = h;
     },
     client: {
+      users: {
+        info: async () => ({ ok: true, user: { profile: { real_name: realName } } }),
+      },
       chat: {
         postMessage: async (m: { channel?: string; blocks?: unknown[] }) => {
           posts.push(m);
@@ -81,6 +85,11 @@ describe('block builders', () => {
     expect(withConsent).toContain('risk_yes');
     expect(without).not.toContain('risk_yes');
   });
+  it('welcomeBlocks menyapa pakai nama + institusi', () => {
+    const blocks = JSON.stringify(welcomeBlocks('Dewi', 'Garuda Corp'));
+    expect(blocks).toContain('Dewi');
+    expect(blocks).toContain('Garuda Corp');
+  });
   it('poolBlocks pakai copy + action claim membawa needId', () => {
     const blocks = JSON.stringify(poolBlocks({ needFramed: 'Tim futsal kurang 1 orang.', claimLabel: 'Isi slot' }, 'need-x'));
     expect(blocks).toContain('Tim futsal kurang 1 orang.');
@@ -111,6 +120,17 @@ describe('SlackAdapter', () => {
     expect(value).toEqual<InboundEvent>({ kind: 'selfReferral', personId: 'sentinel' });
   });
 
+  it('sendWelcome DM satu orang, ambil nama asli dari Slack profile', async () => {
+    const { app, posts } = fakeApp('Dewi Anjani');
+    const adapter = new SlackAdapter(app, directory);
+    await adapter.sendWelcome('p1');
+    await adapter.sendWelcome('pX'); // tak dikenal → tak ada DM
+
+    expect(posts).toHaveLength(1);
+    expect(posts[0].channel).toBe('U1');
+    expect(JSON.stringify(posts[0].blocks)).toContain('Dewi Anjani');
+  });
+
   it('postScreening DM ke satu orang (per orang, bukan broadcast)', async () => {
     const { app, posts } = fakeApp();
     const adapter = new SlackAdapter(app, directory);
@@ -131,6 +151,7 @@ describe('SlackAdapter', () => {
 describe('PortalAdapter (stub)', () => {
   it('semua method throw NotImplemented', async () => {
     const portal = new PortalAdapter();
+    await expect(portal.sendWelcome('p1')).rejects.toThrow('NotImplemented');
     await expect(portal.postScreening('T', '2026-06')).rejects.toThrow('NotImplemented');
     await expect(portal.deliverPool({ id: 'n' } as Need, ['p1'], { needFramed: 'x', claimLabel: 'y' })).rejects.toThrow(
       'NotImplemented',

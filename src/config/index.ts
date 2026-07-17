@@ -10,6 +10,7 @@ export interface AffinityWeights {
 }
 
 export interface Config {
+  INSTITUTION_NAME: string;
   LONELY_THRESHOLD: number;
   CLINICAL_CYCLES: number;
   SCREEN_CADENCE: Cadence;
@@ -39,7 +40,13 @@ function cadence(name: string, fallback: Cadence): Cadence {
   return raw === 'monthly' || raw === 'weekly' ? raw : fallback;
 }
 
+function str(name: string, fallback: string): string {
+  const raw = process.env[name]?.trim();
+  return raw ? raw : fallback;
+}
+
 export const config: Config = {
+  INSTITUTION_NAME: str('INSTITUTION_NAME', 'kampus/kantor kamu'),
   LONELY_THRESHOLD: num('LONELY_THRESHOLD', 6),
   CLINICAL_CYCLES: num('CLINICAL_CYCLES', 3),
   SCREEN_CADENCE: cadence('SCREEN_CADENCE', 'monthly'),

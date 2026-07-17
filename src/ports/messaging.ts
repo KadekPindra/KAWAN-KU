@@ -8,11 +8,14 @@ export type InboundEvent =
   | { kind: 'riskItem'; personId: string; positive: boolean }
   | { kind: 'selfReferral'; personId: string };
 
+export type ClaimOutcome = 'claimed' | 'declined' | 'full';
+
 export interface MessagingPort {
   sendWelcome(personId: string): Promise<void>;
   postScreening(personId: string, cycle: Cycle): Promise<void>;
 
   deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void>;
+  sendClaimAck(personId: string, need: Need, outcome: ClaimOutcome, text: string): Promise<void>;
   openClinicalDoor(userId: string): Promise<void>;
   receiveResponse(): AsyncIterable<InboundEvent>;
 }

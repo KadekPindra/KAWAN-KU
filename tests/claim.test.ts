@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { ClaimService, OutcomeLog } from '../src/core/claim';
 import { InMemoryRepository } from '../src/adapters/inMemory/repository';
+import { InMemoryMessaging } from '../src/adapters/inMemory/messaging';
+import { TemplateClaimAcknowledger } from '../src/core/claimAcknowledger';
 import type { Invite, Need } from '../src/domain/types';
 
 async function setup() {
@@ -52,5 +54,62 @@ describe('ClaimService — atomic first-come', () => {
     const invB = await repo.findInvite('b', 'n');
     expect(invB?.state).toBe('shown');
     expect((await repo.getNeed('n'))?.status).toBe('filled');
+  });
+});
+
+describe('ClaimService — acknowledgement (opsional)', () => {
+  it('tanpa messaging/acknowledger => tak ada efek samping, tetap jalan seperti biasa', async () => {
+    const { svc } = await setup();
+    expect(await svc.claim('a', 'n')).toBe('claimed');
+  });
+
+  it('dengan messaging/acknowledger => kirim teks acknowledge sesuai outcome', async () => {
+    const { repo } = await setup();
+    const messaging = new InMemoryMessaging();
+    const acknowledger = new TemplateClaimAcknowledger();
+    const svc = new ClaimService(repo, new OutcomeLog(repo), messaging, acknowledger);
+
+    await svc.claim('a', 'n');
+    await svc.claim('b', 'n'); // slot sudah penuh
+    await svc.decline('a', 'n'); // sudah claimed, decline tak berefek & tak mengirim ack lagi
+
+    expect(messaging.claimAcks).toHaveLength(2);
+    expect(messaging.claimAcks[0]).toMatchObject({ personId: 'a', outcome: 'claimed' });
+    expect(messaging.claimAcks[1]).toMatchObject({ personId: 'b', outcome: 'full' });
+  });
+
+  it('decline valid => kirim ack outcome declined', async () => {
+    const repo = new InMemoryRepository();
+    const need: Need = {
+      id: 'n2',
+      teamId: 'T',
+      source: 'member',
+      rawText: 'raw',
+      parsed: null,
+      slotsTotal: 1,
+      slotsOpen: 1,
+      week: '2026-W29',
+      status: 'open',
+      createdAt: new Date(),
+    };
+    await repo.saveNeed(need);
+    const invite: Invite = {
+      id: 'invite:p:a',
+      poolId: 'p',
+      personId: 'a',
+      needId: 'n2',
+      deliveredAt: new Date(),
+      state: 'shown',
+      claimedAt: null,
+    };
+    await repo.saveInvite(invite);
+
+    const messaging = new InMemoryMessaging();
+    const svc = new ClaimService(repo, new OutcomeLog(repo), messaging, new TemplateClaimAcknowledger());
+    await svc.decline('a', 'n2');
+
+    expect(messaging.claimAcks).toEqual([
+      expect.objectContaining({ personId: 'a', outcome: 'declined' }),
+    ]);
   });
 });

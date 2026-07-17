@@ -4,7 +4,7 @@ export interface NeedParser {
   parse(rawText: string): Promise<ParsedNeed>;
 }
 
-const ACTIVITIES = [
+export const ACTIVITIES = [
   'futsal', 'basket', 'badminton', 'voli', 'board game', 'boardgame',
   'desain', 'ngoding', 'musik', 'film', 'baca', 'lari', 'kopi',
 ];
@@ -12,7 +12,6 @@ const ACTIVITIES = [
 const DAYS = /\b(senin|selasa|rabu|kamis|jumat|sabtu|minggu)\b/;
 const TIME_OF_DAY = /\b(pagi|siang|sore|malam)\b/;
 const CLOCK = /jam\s*\d+/;
-// Best-effort: "di/at <Nama Tempat>" sampai tanda baca/penghubung waktu berikutnya. Bisa kosong kalau tak disebut.
 const LOCATION = /\b(?:di|at)\s+([a-z][a-z0-9\s]{2,30}?)(?=\s*(?:jam|sore|pagi|siang|malam|,|\.|$))/i;
 
 export function parseNeedTemplate(rawText: string): ParsedNeed {

@@ -8,7 +8,8 @@ export type InboundEvent =
   | { kind: 'selfReferral'; personId: string };
 
 export interface MessagingPort {
-  postScreening(teamId: string, cycle: Cycle): Promise<void>;
+  postScreening(personId: string, cycle: Cycle): Promise<void>; 
+
   deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void>;
   openClinicalDoor(userId: string): Promise<void>;
   receiveResponse(): AsyncIterable<InboundEvent>;

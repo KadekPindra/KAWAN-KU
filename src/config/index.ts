@@ -10,15 +10,20 @@ export interface AffinityWeights {
 }
 
 export interface Config {
-  LONELY_THRESHOLD: number; 
-  CLINICAL_CYCLES: number; 
+  LONELY_THRESHOLD: number;
+  CLINICAL_CYCLES: number;
   SCREEN_CADENCE: Cadence;
+  SCREEN_INTERVAL_NEUTRAL_DAYS: number;   
+  SCREEN_INTERVAL_BASE_DAYS: number;      
+  SCREEN_INTERVAL_ELEVATED_DAYS: number;  
+  SCREEN_JITTER_DAYS: number;             
+  SCREEN_SEND_HOUR_RANGE: [number, number];
   ROUTE_CADENCE: Cadence;
   POOL_SIZE: number;
-  MAX_SKEW_RATIO: number; 
-  MAX_POOLS_PER_WEEK: number; 
-  SUPPLY_FLOOR: number; 
-  K_ANON: number; 
+  MAX_SKEW_RATIO: number;
+  MAX_POOLS_PER_WEEK: number;
+  SUPPLY_FLOOR: number;
+  K_ANON: number;
   affinityWeights: AffinityWeights;
 }
 
@@ -38,6 +43,11 @@ export const config: Config = {
   LONELY_THRESHOLD: num('LONELY_THRESHOLD', 6),
   CLINICAL_CYCLES: num('CLINICAL_CYCLES', 3),
   SCREEN_CADENCE: cadence('SCREEN_CADENCE', 'monthly'),
+  SCREEN_INTERVAL_NEUTRAL_DAYS: num('SCREEN_INTERVAL_NEUTRAL_DAYS', 42),
+  SCREEN_INTERVAL_BASE_DAYS: num('SCREEN_INTERVAL_BASE_DAYS', 28),
+  SCREEN_INTERVAL_ELEVATED_DAYS: num('SCREEN_INTERVAL_ELEVATED_DAYS', 14),
+  SCREEN_JITTER_DAYS: num('SCREEN_JITTER_DAYS', 5),
+  SCREEN_SEND_HOUR_RANGE: [num('SCREEN_SEND_HOUR_MIN', 8), num('SCREEN_SEND_HOUR_MAX', 19)],
   ROUTE_CADENCE: cadence('ROUTE_CADENCE', 'weekly'),
   POOL_SIZE: num('POOL_SIZE', 6),
   MAX_SKEW_RATIO: num('MAX_SKEW_RATIO', 1 / 3),

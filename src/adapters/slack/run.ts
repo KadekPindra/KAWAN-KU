@@ -7,7 +7,7 @@ import { ClaimService, OutcomeLog } from '../../core/claim';
 import { ClinicalRouter } from '../../core/clinicalRouter';
 import { handleInbound } from '../../pipelines/continuous';
 import { Scheduler } from '../../pipelines/scheduler';
-import { DEMO_CYCLES, DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
+import { DEMO_TEAM_ID, DEMO_WEEK, seedDemoNeeds, seedDemoTeam } from '../../seed/demoTeam';
 import { RepoSlackDirectory } from './directory';
 import { SlackAdapter } from './slackAdapter';
 
@@ -25,8 +25,6 @@ function num(name: string, fallback: number): number {
 
 const HOUR = 60 * 60 * 1000;
 const WEEK = 7 * 24 * HOUR;
-
-const cycle = DEMO_CYCLES[DEMO_CYCLES.length - 1];
 
 const repo = await createRepository();
 if (process.env.KAWAN_REPO?.trim().toLowerCase() !== 'postgres') {
@@ -54,7 +52,7 @@ const clinical = new ClinicalRouter(repo, messaging);
 
 const scheduler = new Scheduler(
   { repo, messaging, parser, composer, screening },
-  { teamId: DEMO_TEAM_ID, cycle, week: DEMO_WEEK },
+  { teamId: DEMO_TEAM_ID, week: DEMO_WEEK },
   { screenTickMs: num('SCREEN_TICK_MS', HOUR), routeTickMs: num('ROUTE_TICK_MS', WEEK) },
 );
 

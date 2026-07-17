@@ -5,10 +5,10 @@ import type { InboundEvent } from '../src/ports/messaging';
 describe('InMemoryMessaging', () => {
   it('mencatat outbound: screening, pool, pintu klinis', async () => {
     const m = new InMemoryMessaging();
-    await m.postScreening('T', '2026-01');
+    await m.postScreening('p1', '2026-01');
     await m.openClinicalDoor('u1');
 
-    expect(m.postedScreenings).toEqual([{ teamId: 'T', cycle: '2026-01' }]);
+    expect(m.postedScreenings).toEqual([{ personId: 'p1', cycle: '2026-01' }]);
     expect(m.clinicalDoors).toEqual(['u1']);
   });
 

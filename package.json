@@ -10,6 +10,7 @@
     "test:watch": "vitest",
     "demo": "tsx src/demo/runSpine.ts",
     "slack": "tsx src/adapters/slack/run.ts",
+    "slack:demo": "tsx src/adapters/slack/demo.ts",
     "seed": "tsx src/seed/seed.ts",
     "db:seed": "tsx src/adapters/postgres/seed.ts",
     "metrics": "tsx src/views/run.ts",

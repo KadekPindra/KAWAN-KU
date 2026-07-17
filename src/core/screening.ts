@@ -2,6 +2,8 @@ import { config, type Config } from '../config/index';
 import type { Anchor, Cycle, Screening } from '../domain/types';
 import type { Repository } from '../ports/repository';
 import type { MessagingPort } from '../ports/messaging';
+import { deriveDetection } from './detection';
+import { nextDueAt } from './screenSchedule';
 
 export function scoreUcla3(q1: Anchor, q2: Anchor, q3: Anchor): number {
   return q1 + q2 + q3;
@@ -34,15 +36,41 @@ export class ScreeningService {
     private readonly messaging: MessagingPort,
   ) {}
 
-  async deliver(teamId: string, cycle: Cycle, now: Date = new Date()): Promise<void> {
+  // §5.1.1 — kirim hanya ke orang yang jatuh tempo (next_due_at diturunkan dari riwayat),
+  // per orang, bukan broadcast. Idempoten per cycle: skip yang sudah punya screening.
+  async deliver(
+    teamId: string,
+    cycle: Cycle,
+    now: Date = new Date(),
+    cfg: Config = config,
+  ): Promise<void> {
     for (const p of await this.repo.listPeople(teamId)) {
       if (!p.optedIn) continue;
       if (await this.repo.getScreening(teamId, p.id, cycle)) continue;
+      if (!(await this.isDue(teamId, p.id, now, cfg))) continue;
       const s = blank(teamId, p.id, cycle, now);
       s.deliveredAt = now;
       await this.repo.saveScreening(s);
+      await this.messaging.postScreening(p.id, cycle);
     }
-    await this.messaging.postScreening(teamId, cycle);
+  }
+
+  // Jatuh tempo bila now >= next_due_at. Orang tanpa riwayat pengiriman = langsung due (cold start).
+  async isDue(teamId: string, personId: string, now: Date, cfg: Config = config): Promise<boolean> {
+    const history = (await this.repo.listScreeningsForPerson(teamId, personId)).sort((a, b) =>
+      a.cycle < b.cycle ? -1 : a.cycle > b.cycle ? 1 : 0,
+    );
+    const delivered = history.filter((h) => h.deliveredAt !== null);
+    if (delivered.length === 0) return true;
+
+    const lastDelivered = delivered.reduce((max, h) =>
+      (h.deliveredAt as Date) > (max.deliveredAt as Date) ? h : max,
+    ).deliveredAt as Date;
+
+    const answered = history.filter((h) => h.ucla3Score !== null);
+    const streak = answered.length > 0 ? deriveDetection(answered, cfg).lonelyStreak : 0;
+    const due = nextDueAt(lastDelivered, streak, personId, history.length, cfg);
+    return now.getTime() >= due.getTime();
   }
 
   async recordAnswer(

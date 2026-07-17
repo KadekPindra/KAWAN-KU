@@ -18,7 +18,6 @@ export interface SchedulerDeps {
 
 export interface SchedulerTarget {
   teamId: string;
-  cycle: string;
   week: string;
 }
 
@@ -27,8 +26,10 @@ export interface SchedulerIntervals {
   routeTickMs: number;
 }
 
-// Pemicu proaktif: sistem mendatangi orang, tak ada command yang bisa diketik peserta.
-// Fase A masih memakai satu cycle/week target. Fase B melapisi next_due_at + jitter per orang (§5.1.1).
+export function cycleOf(now: Date): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 export class Scheduler {
   private timers: ReturnType<typeof setInterval>[] = [];
 
@@ -39,12 +40,13 @@ export class Scheduler {
   ) {}
 
   async screenTick(now: Date = new Date()): Promise<void> {
-    await this.deps.screening.deliver(this.target.teamId, this.target.cycle, now);
-    await runMonthly(this.deps, this.target.teamId, this.target.cycle);
+    const cycle = cycleOf(now);
+    await this.deps.screening.deliver(this.target.teamId, cycle, now);
+    await runMonthly(this.deps, this.target.teamId, cycle);
   }
 
   async routeTick(now: Date = new Date()): Promise<void> {
-    await runWeekly(this.deps, this.target.teamId, this.target.week, this.target.cycle, now);
+    await runWeekly(this.deps, this.target.teamId, this.target.week, cycleOf(now), now);
   }
 
   async openClinicalDoors(): Promise<void> {

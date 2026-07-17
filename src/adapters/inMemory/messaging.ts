@@ -1,7 +1,7 @@
 import type { MessagingPort, InboundEvent } from '../../ports/messaging';
 import type { Cycle, InviteCopy, Need } from '../../domain/types';
 
-type PostedScreening = { teamId: string; cycle: Cycle };
+type PostedScreening = { personId: string; cycle: Cycle };
 type DeliveredPool = { need: Need; userIds: string[]; copy: InviteCopy };
 
 export class InMemoryMessaging implements MessagingPort {
@@ -13,8 +13,8 @@ export class InMemoryMessaging implements MessagingPort {
   private waiting: ((r: IteratorResult<InboundEvent>) => void)[] = [];
   private closed = false;
 
-  async postScreening(teamId: string, cycle: Cycle): Promise<void> {
-    this.postedScreenings.push({ teamId, cycle });
+  async postScreening(personId: string, cycle: Cycle): Promise<void> {
+    this.postedScreenings.push({ personId, cycle });
   }
   async deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void> {
     this.deliveredPools.push({ need, userIds, copy });

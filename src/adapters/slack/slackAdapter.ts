@@ -144,14 +144,14 @@ export class SlackAdapter implements MessagingPort {
     });
   }
 
-  async postScreening(teamId: string, cycle: Cycle): Promise<void> {
-    for (const r of await this.directory.recipients(teamId)) {
-      await this.app.client.chat.postMessage({
-        channel: r.slackUserId,
-        text: 'Cek singkat bulanan',
-        blocks: screeningBlocks(cycle, r.riskConsent),
-      });
-    }
+  async postScreening(personId: string, cycle: Cycle): Promise<void> {
+    const r = await this.directory.recipientFor(personId);
+    if (!r) return;
+    await this.app.client.chat.postMessage({
+      channel: r.slackUserId,
+      text: 'Cek singkat',
+      blocks: screeningBlocks(cycle, r.riskConsent),
+    });
   }
 
   async deliverPool(need: Need, userIds: string[], copy: InviteCopy): Promise<void> {

@@ -110,6 +110,22 @@ const app = new App({
 
 const directory = new RepoSlackDirectory(repo, DEMO_TEAM_ID);
 const messaging = new SlackAdapter(app, directory);
+
+app.event('team_join', async ({ event }) => {
+  const person: Person = {
+    id: event.user.id,
+    teamId: DEMO_TEAM_ID,
+    displayName: event.user.profile?.real_name || event.user.real_name || event.user.name,
+    slackUserId: event.user.id,
+    joinedAt: new Date(),
+    interests: [],
+    optedIn: true,
+    riskConsent: false,
+  };
+  await repo.savePerson(person);
+  await messaging.sendWelcome(person.id);
+});
+
 const gemini = createGeminiClient();
 const parser = new GeminiNeedParser(gemini);
 const composer = new GeminiInviteComposer(gemini);
